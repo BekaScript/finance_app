@@ -1,0 +1,1 @@
+C:\FlutterProjects\Personal_Finance_App\build\app\intermediates\cxx\Debug\504g4x2g\obj\arm64-v8a
