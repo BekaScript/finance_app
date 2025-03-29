@@ -54,17 +54,17 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     bool confirmDelete = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Delete Transaction"),
-        content:
-            const Text("Are you sure you want to delete this transaction?"),
+        title: Text(_languageService.translate('deleteTransaction')),
+        content: Text(_languageService.translate('confirmDeleteTransaction')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(_languageService.translate('cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            child: Text(_languageService.translate('delete'), 
+              style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -113,7 +113,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blueAccent, Colors.purpleAccent],
+              colors: [Color(0xFF1A237E), Color(0xFF64B5F6)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -121,24 +121,31 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _loadTransactions,
-              child: filteredTransactions.isEmpty
-                  ? const Center(child: Text("No transactions found"))
-                  : ListView.builder(
-                      itemCount: filteredTransactions.length,
-                      itemBuilder: (context, index) {
-                        final transaction = filteredTransactions[index];
-                        return _buildTransactionCard(transaction);
-                      },
-                    ),
+      body: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark 
+              ? Colors.black.withAlpha(179)
+              : Colors.white.withAlpha(179),
+        ),
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _loadTransactions,
+                child: filteredTransactions.isEmpty
+                    ? Center(child: Text(_languageService.translate('noTransactionFound')))
+                    : ListView.builder(
+                        itemCount: filteredTransactions.length,
+                        itemBuilder: (context, index) {
+                          final transaction = filteredTransactions[index];
+                          return _buildTransactionCard(transaction);
+                        },
+                      ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -174,6 +181,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   }
 
   Widget _buildTransactionCard(Map<String, dynamic> transaction) {
+    final theme = Theme.of(context);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -209,11 +217,16 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           ),
           title: Text(
             _languageService.translate(transaction['category']),
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: theme.textTheme.bodyLarge?.color,
+            ),
           ),
           subtitle: Text(
             '${_languageService.translate(transaction['description'])} - ${transaction['date']}',
-            style: TextStyle(color: Colors.grey.shade600),
+            style: TextStyle(
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+            ),
           ),
           trailing: Text(
             transaction['type'] == 'expense' ? 
@@ -236,22 +249,23 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Transaction Actions"),
-          content: const Text("What would you like to do?"),
+          title: Text(_languageService.translate('transactionActions')),
+          content: Text(_languageService.translate('whatWouldYouLikeToDo')),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
                 _editTransaction(transaction);
               },
-              child: const Text("Edit"),
+              child: Text(_languageService.translate('edit')),
             ),
             TextButton(
               onPressed: () async {
                 Navigator.pop(context);
                 await _deleteTransaction(transaction['id']);
               },
-              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+              child: Text(_languageService.translate('delete'), 
+                style: const TextStyle(color: Colors.red)),
             ),
           ],
         );

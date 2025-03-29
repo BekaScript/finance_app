@@ -6,7 +6,7 @@ class SummaryCard extends StatelessWidget {
   final Color color;
   final IconData icon;
 
-  const SummaryCard({
+  const SummaryCard({super.key, 
     required this.title,
     required this.amount,
     required this.color,
@@ -15,10 +15,11 @@ class SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
-      ), // <-- Fixed: Added closing parenthesis
+      ),
       elevation: 4,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
@@ -40,7 +41,7 @@ class SummaryCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: theme.textTheme.bodyLarge?.color,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -56,7 +57,7 @@ class SummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            Icon(Icons.arrow_forward_ios, size: 16, color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7)),
           ],
         ),
       ),

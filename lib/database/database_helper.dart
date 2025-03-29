@@ -62,19 +62,34 @@ class DatabaseHelper {
         is_logged_in INTEGER DEFAULT 0
       )
       ''');
+
     await db.execute('''
       CREATE TABLE settings(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         currency TEXT DEFAULT 'USD',
-        language TEXT DEFAULT 'en'
+        language TEXT DEFAULT 'en',
+        isDarkMode INTEGER DEFAULT 0
       )
     ''');
 
     // Insert default settings
     await db.insert('settings', {
       'currency': 'USD',
-      'language': 'en'
+      'language': 'en',
+      'isDarkMode': 0
     });
+
+    // Insert default user
+    try {
+      await db.insert('user', {
+        'name': 'Default User',
+        'email': 'user@example.com',
+        'password': 'password123',
+        'is_logged_in': 0
+      });
+    } catch (e) {
+      print('Error creating default user: $e');
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -158,5 +173,41 @@ class DatabaseHelper {
     }
     
     return settings.first['language'] as String? ?? 'en';
+  }
+
+  Future<void> setDarkMode(bool isDarkMode) async {
+    print('DatabaseHelper: Setting dark mode to: $isDarkMode');
+    final db = await database;
+    final List<Map<String, dynamic>> settings = await db.query('settings');
+    
+    if (settings.isEmpty) {
+      print('DatabaseHelper: No settings found, creating new settings');
+      await db.insert('settings', {'isDarkMode': isDarkMode ? 1 : 0});
+    } else {
+      print('DatabaseHelper: Updating existing settings');
+      await db.update(
+        'settings',
+        {'isDarkMode': isDarkMode ? 1 : 0},
+        where: 'id = ?',
+        whereArgs: [settings.first['id']],
+      );
+    }
+    print('DatabaseHelper: Dark mode setting saved successfully');
+  }
+
+  Future<bool> getDarkMode() async {
+    print('DatabaseHelper: Getting dark mode setting');
+    final db = await database;
+    final List<Map<String, dynamic>> settings = await db.query('settings');
+    
+    if (settings.isEmpty) {
+      print('DatabaseHelper: No settings found, creating default settings');
+      await db.insert('settings', {'isDarkMode': 0});
+      return false;
+    }
+    
+    final isDarkMode = settings.first['isDarkMode'] == 1;
+    print('DatabaseHelper: Retrieved dark mode setting: $isDarkMode');
+    return isDarkMode;
   }
 }

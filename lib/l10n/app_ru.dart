@@ -4,6 +4,23 @@ Map<String, String> ruTranslations = {
   'personalFinance': 'Личные финансы',
   'settings': 'Настройки',
   
+  // Login/Register
+  'welcomeBack': 'С возвращением!',
+  'createAccount': 'Создать аккаунт',
+  'login': 'Войти',
+  'register': 'Регистрация',
+  'name': 'Имя',
+  'email': 'Электронная почта',
+  'password': 'Пароль',
+  'pleaseEnterName': 'Пожалуйста, введите ваше имя',
+  'pleaseEnterEmail': 'Пожалуйста, введите вашу электронную почту',
+  'pleaseEnterPassword': 'Пожалуйста, введите ваш пароль',
+  'invalidEmailPassword': 'Неверный email или пароль',
+  'registrationSuccessful': 'Регистрация успешна! Пожалуйста, войдите.',
+  'emailExists': 'Email уже существует или регистрация не удалась',
+  'dontHaveAccount': 'Нет аккаунта? Зарегистрироваться',
+  'alreadyHaveAccount': 'Уже есть аккаунт? Войти',
+  
   // Navigation
   'home': 'Главная',
   'history': 'История',
@@ -34,6 +51,7 @@ Map<String, String> ruTranslations = {
   'EUR': 'Евро',
   'INR': 'Индийская рупия',
   'KGS': 'Кыргызский сом',
+  'languageUpdated': 'Язык обновлен',
   
   // Categories
   'Food': 'Еда',
@@ -45,12 +63,16 @@ Map<String, String> ruTranslations = {
   // Reports Screen
   'categoryWiseSpending': 'Расходы по категориям',
   'monthlySpendingTrends': 'Ежемесячные тенденции',
+  'monthlyIncome': 'Ежемесячный доход',
+  'monthlyExpenses': 'Ежемесячные расходы',
   'filters': 'Фильтры',
   'type': 'Тип',
   'all': 'Все',
   'dateRange': 'Период',
   'selectStartDate': 'Выберите начальную дату',
   'selectEndDate': 'Выберите конечную дату',
+  'noDataAvailable': 'Нет данных для выбранного фильтра',
+  'noDataForFilters': 'Нет данных для выбранных фильтров',
   
   // Transaction
   'edit': 'Изменить',
@@ -60,6 +82,7 @@ Map<String, String> ruTranslations = {
   'description': 'Описание',
   'amount': 'Сумма',
   'date': 'Дата',
+  'noTransactionFound': 'Транзакции не найдены',
   
   // Reports
   'filterByCategory': 'Фильтр по категории',
@@ -74,4 +97,10 @@ Map<String, String> ruTranslations = {
   'income': 'Доход',
   'selectDate': 'Выберите дату',
   'searchTransactions': 'Поиск транзакций',
+  
+  // Transaction Actions
+  'deleteTransaction': 'Удалить транзакцию',
+  'confirmDeleteTransaction': 'Вы уверены, что хотите удалить эту транзакцию?',
+  'transactionActions': 'Действия с транзакцией',
+  'whatWouldYouLikeToDo': 'Что вы хотите сделать?',
 }; 

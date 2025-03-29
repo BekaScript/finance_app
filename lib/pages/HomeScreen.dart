@@ -178,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blueAccent, Colors.purpleAccent],
+              colors: [Color(0xFF1A237E), Color(0xFF64B5F6)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -187,72 +187,78 @@ class _HomeScreenState extends State<HomeScreen> {
         foregroundColor: Colors.white,
       ),
       drawer: _buildDrawer(),
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          // Summary Cards
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                SummaryCard(
-                  title: _languageService.translate('income'),
-                  amount: '$_currencySymbol${_totalIncome.toStringAsFixed(2)}',
-                  color: Colors.green,
-                  icon: Icons.arrow_upward,
-                ),
-                const SizedBox(height: 12),
-                SummaryCard(
-                  title: _languageService.translate('expenses'),
-                  amount: '$_currencySymbol${_totalExpenses.toStringAsFixed(2)}',
-                  color: Colors.red,
-                  icon: Icons.arrow_downward,
-                ),
-                const SizedBox(height: 12),
-                SummaryCard(
-                  title: _languageService.translate('balance'),
-                  amount: '$_currencySymbol${_balance.toStringAsFixed(2)}',
-                  color: Colors.blue,
-                  icon: Icons.account_balance_wallet,
-                ),
-              ],
-            ),
-          ),
-
-          // Recent Transactions
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                setState(() {
-                  _loadData(); // Refresh data
-                });
-              },
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _transactionsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Center(
-                      child: Text(_languageService.translate('noTransactions'))
-                    );
-                  }
-
-                  final transactions = snapshot.data!;
-                  return ListView.builder(
-                    itemCount: transactions.length,
-                    itemBuilder: (context, index) {
-                      final transaction = transactions[index];
-                      return _buildTransactionTile(transaction);
-                    },
-                  );
-                },
+      body: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark 
+              ? Colors.black.withAlpha(179) // 0.7 * 255 ≈ 179
+              : Colors.white.withAlpha(179),
+        ),
+        child: Column(
+          children: [
+            // Summary Cards
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  SummaryCard(
+                    title: _languageService.translate('income'),
+                    amount: '$_currencySymbol${_totalIncome.toStringAsFixed(2)}',
+                    color: Colors.green,
+                    icon: Icons.arrow_upward,
+                  ),
+                  const SizedBox(height: 12),
+                  SummaryCard(
+                    title: _languageService.translate('expenses'),
+                    amount: '$_currencySymbol${_totalExpenses.toStringAsFixed(2)}',
+                    color: Colors.red,
+                    icon: Icons.arrow_downward,
+                  ),
+                  const SizedBox(height: 12),
+                  SummaryCard(
+                    title: _languageService.translate('balance'),
+                    amount: '$_currencySymbol${_balance.toStringAsFixed(2)}',
+                    color: Colors.blue,
+                    icon: Icons.account_balance_wallet,
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+
+            // Recent Transactions
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  setState(() {
+                    _loadData(); // Refresh data
+                  });
+                },
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _transactionsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return Center(
+                        child: Text(_languageService.translate('noTransactions'))
+                      );
+                    }
+
+                    final transactions = snapshot.data!;
+                    return ListView.builder(
+                      itemCount: transactions.length,
+                      itemBuilder: (context, index) {
+                        final transaction = transactions[index];
+                        return _buildTransactionTile(transaction);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
 
       // Floating Action Button
@@ -278,6 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Widget to display each transaction
   Widget _buildTransactionTile(Map<String, dynamic> transaction) {
     bool isIncome = transaction['type'] == 'income';
+    final theme = Theme.of(context);
 
     return Card(
       elevation: 2,
@@ -294,11 +301,17 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         title: Text(
           _languageService.translate(transaction['category'] ?? 'Others'),
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.textTheme.bodyLarge?.color,
+          ),
         ),
         subtitle: Text(
           '${_languageService.translate(transaction['description'])} - ${transaction['date']}',
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          style: TextStyle(
+            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+            fontSize: 12,
+          ),
         ),
         trailing: Text(
           '$_currencySymbol${transaction['amount'].toStringAsFixed(2)}',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../database/database_helper.dart';
+import '../services/language_service.dart';
 
 class Loginregister extends StatefulWidget {
   const Loginregister({super.key});
@@ -16,10 +17,12 @@ class _LoginregisterState extends State<Loginregister> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final DatabaseHelper _dbHelper = DatabaseHelper();
+  final LanguageService _languageService = LanguageService();
 
   // Function to handle login
   Future<bool> _login(String email, String password) async {
     try {
+      print('Attempting login with email: $email');
       final db = await _dbHelper.database;
       
       // First, reset all users' logged_in status
@@ -32,7 +35,9 @@ class _LoginregisterState extends State<Loginregister> {
         whereArgs: [email, password],
       );
       
+      print('Found ${users.length} users matching credentials');
       if (users.isNotEmpty) {
+        print('User found: ${users.first}');
         // Set this user as logged in
         await db.update(
           'user',
@@ -42,6 +47,7 @@ class _LoginregisterState extends State<Loginregister> {
         );
         return true;
       }
+      print('No user found with these credentials');
       return false;
     } catch (e) {
       print('Login error: $e');
@@ -92,9 +98,12 @@ class _LoginregisterState extends State<Loginregister> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.deepPurple, Colors.purpleAccent],
+            colors: [
+              const Color(0xFF1A237E),
+              const Color(0xFF64B5F6),
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -108,6 +117,9 @@ class _LoginregisterState extends State<Loginregister> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
+                color: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.black 
+                    : Colors.white,
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Form(
@@ -123,7 +135,7 @@ class _LoginregisterState extends State<Loginregister> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _isLogin ? "Welcome Back!" : "Create Account",
+                          _isLogin ? _languageService.translate('welcomeBack') : _languageService.translate('createAccount'),
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -139,12 +151,12 @@ class _LoginregisterState extends State<Loginregister> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              labelText: 'Name',
+                              labelText: _languageService.translate('name'),
                               prefixIcon: const Icon(Icons.person),
                             ),
                             validator: (value) {
                               if (!_isLogin && (value == null || value.isEmpty)) {
-                                return 'Please enter your name';
+                                return _languageService.translate('pleaseEnterName');
                               }
                               return null;
                             },
@@ -156,12 +168,12 @@ class _LoginregisterState extends State<Loginregister> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            labelText: 'Email',
+                            labelText: _languageService.translate('email'),
                             prefixIcon: const Icon(Icons.email),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your email';
+                              return _languageService.translate('pleaseEnterEmail');
                             }
                             return null;
                           },
@@ -173,13 +185,13 @@ class _LoginregisterState extends State<Loginregister> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            labelText: 'Password',
+                            labelText: _languageService.translate('password'),
                             prefixIcon: const Icon(Icons.lock),
                           ),
                           obscureText: true,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your password';
+                              return _languageService.translate('pleaseEnterPassword');
                             }
                             return null;
                           },
@@ -205,7 +217,7 @@ class _LoginregisterState extends State<Loginregister> {
                                       ),
                                     );
                                   } else {
-                                    _showError('Invalid email or password');
+                                    _showError(_languageService.translate('invalidEmailPassword'));
                                   }
                                 } else {
                                   // Handle Registration
@@ -219,14 +231,14 @@ class _LoginregisterState extends State<Loginregister> {
                                     setState(() {
                                       _isLogin = true; // Switch to login view
                                     });
-                                    _showError('Registration successful! Please login.');
+                                    _showError(_languageService.translate('registrationSuccessful'));
                                     
                                     // Clear the form
                                     _nameController.clear();
                                     _emailController.clear();
                                     _passwordController.clear();
                                   } else {
-                                    _showError('Email already exists or registration failed');
+                                    _showError(_languageService.translate('emailExists'));
                                   }
                                 }
                               }
@@ -241,7 +253,7 @@ class _LoginregisterState extends State<Loginregister> {
                               backgroundColor: Colors.deepPurple,
                             ),
                             child: Text(
-                              _isLogin ? "Login" : "Register",
+                              _isLogin ? _languageService.translate('login') : _languageService.translate('register'),
                               style: const TextStyle(
                                   fontSize: 18,
                                   color: Color.fromARGB(255, 255, 255, 255),
@@ -259,8 +271,8 @@ class _LoginregisterState extends State<Loginregister> {
                           },
                           child: Text(
                             _isLogin
-                                ? "Don't have an account? Register"
-                                : "Already have an account? Login",
+                                ? _languageService.translate('dontHaveAccount')
+                                : _languageService.translate('alreadyHaveAccount'),
                             style: const TextStyle(color: Colors.deepPurple),
                           ),
                         ),

@@ -1,0 +1,2 @@
+C:/BudgetApp/finance_app/android/app/.cxx/Debug/4453m636/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/BudgetApp/finance_app/android/app/.cxx/Debug/4453m636/armeabi-v7a/CMakeFiles/rebuild_cache.dir
