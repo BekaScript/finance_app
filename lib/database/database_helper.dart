@@ -72,6 +72,14 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE exchange_rates(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        currency TEXT UNIQUE,
+        rate REAL
+      )
+    ''');
+
     // Insert default settings
     await db.insert('settings', {
       'currency': 'USD',
@@ -90,6 +98,12 @@ class DatabaseHelper {
     } catch (e) {
       print('Error creating default user: $e');
     }
+
+    // Insert default exchange rates
+    await db.insert('exchange_rates', {'currency': 'KGS', 'rate': 1.0});
+    await db.insert('exchange_rates', {'currency': 'USD', 'rate': 89.5});
+    await db.insert('exchange_rates', {'currency': 'EUR', 'rate': 95.6});
+    await db.insert('exchange_rates', {'currency': 'INR', 'rate': 1.1});
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -209,5 +223,60 @@ class DatabaseHelper {
     final isDarkMode = settings.first['isDarkMode'] == 1;
     print('DatabaseHelper: Retrieved dark mode setting: $isDarkMode');
     return isDarkMode;
+  }
+
+  Future<double> getExchangeRate(String currency) async {
+    final db = await database;
+    final results = await db.query(
+      'exchange_rates',
+      columns: ['rate'],
+      where: 'currency = ?',
+      whereArgs: [currency],
+    );
+    if (results.isEmpty) {
+      // Default rates if not set (approximately correct as of 2023)
+      final defaultRates = {
+        'USD': 89.5,   // 1 USD = 89.5 KGS
+        'EUR': 95.6,   // 1 EUR = 95.6 KGS
+        'INR': 1.1,    // 1 INR = 1.1 KGS
+        'KGS': 1.0,    // 1 KGS = 1 KGS (base currency)
+      };
+      
+      // Store the default rate
+      await db.insert('exchange_rates', {
+        'currency': currency,
+        'rate': defaultRates[currency] ?? 1.0,
+      });
+      
+      return defaultRates[currency] ?? 1.0;
+    }
+    return results.first['rate'] as double;
+  }
+
+  Future<void> setExchangeRate(String currency, double rate) async {
+    final db = await database;
+    // Check if entry exists
+    final results = await db.query(
+      'exchange_rates',
+      columns: ['id'],
+      where: 'currency = ?',
+      whereArgs: [currency],
+    );
+    
+    if (results.isEmpty) {
+      // Insert new entry
+      await db.insert('exchange_rates', {
+        'currency': currency,
+        'rate': rate,
+      });
+    } else {
+      // Update existing entry
+      await db.update(
+        'exchange_rates',
+        {'rate': rate},
+        where: 'currency = ?',
+        whereArgs: [currency],
+      );
+    }
   }
 }

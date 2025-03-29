@@ -126,26 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(),
 
               // Currency Selection
-              ListTile(
-                leading: const Icon(Icons.attach_money, color: Colors.deepPurple),
-                title: Text(_languageService.translate('selectCurrency')),
-                subtitle: DropdownButtonFormField<String>(
-                  value: _selectedCurrency,
-                  onChanged: _selectCurrency,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  items: [
-                    DropdownMenuItem(value: 'USD', child: Text('USD - ${_languageService.translate('USD')}')),
-                    DropdownMenuItem(value: 'EUR', child: Text('EUR - ${_languageService.translate('EUR')}')),
-                    DropdownMenuItem(value: 'INR', child: Text('INR - ${_languageService.translate('INR')}')),
-                    DropdownMenuItem(value: 'KGS', child: Text('KGS - ${_languageService.translate('KGS')}')),
-                  ],
-                ),
-              ),
+              _buildCurrencySelector(),
 
               const SizedBox(height: 16),
               const Divider(),
@@ -196,6 +177,142 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  // Currency selection
+  Widget _buildCurrencySelector() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _languageService.translate('selectCurrency'),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _buildCurrencyOption('USD'),
+                _buildCurrencyOption('EUR'),
+                _buildCurrencyOption('INR'),
+                _buildCurrencyOption('KGS'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Individual currency option
+  Widget _buildCurrencyOption(String currency) {
+    final isSelected = _selectedCurrency == currency;
+    return InkWell(
+      onTap: () => _showExchangeRateDialog(currency),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Text(
+          _languageService.translate(currency),
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Show exchange rate dialog when selecting currency
+  Future<void> _showExchangeRateDialog(String currency) async {
+    if (currency == _selectedCurrency) return;
+    
+    // Get current exchange rate for this currency
+    double currentRate = await _dbHelper.getExchangeRate(currency);
+    final rateController = TextEditingController(text: currentRate.toString());
+    
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_languageService.translate('setExchangeRate')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('1 ${_languageService.translate(currency)} = ? KGS'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: rateController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: _languageService.translate('exchangeRate'),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_languageService.translate('cancel')),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // Parse the rate and validate
+              double? rate = double.tryParse(rateController.text);
+              if (rate != null && rate > 0) {
+                // Update the exchange rate
+                await _dbHelper.setExchangeRate(currency, rate);
+                // Update the currency
+                await _setCurrency(currency);
+                // Close dialog
+                if (mounted) {
+                  Navigator.pop(context);
+                  // Show confirmation
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _languageService.translate('currencyRateUpdated'),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } else {
+                // Show error
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(_languageService.translate('invalidRate')),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: Text(_languageService.translate('save')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Set currency in database
+  Future<void> _setCurrency(String currency) async {
+    await _dbHelper.setCurrency(currency);
+    setState(() {
+      _selectedCurrency = currency;
+    });
   }
 }
 
