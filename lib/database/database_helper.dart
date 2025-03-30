@@ -64,13 +64,14 @@ class DatabaseHelper {
     ''');
     await db.execute('''
       CREATE TABLE user(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
-        email TEXT UNIQUE,
+        email TEXT,
         password TEXT,
-        is_logged_in INTEGER DEFAULT 0
+        is_logged_in INTEGER DEFAULT 0,
+        remember_me INTEGER DEFAULT 0
       )
-      ''');
+    ''');
 
     await db.execute('''
       CREATE TABLE settings(

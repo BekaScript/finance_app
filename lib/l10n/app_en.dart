@@ -3,6 +3,7 @@ Map<String, String> enTranslations = {
   // General
   'personalFinance': 'Personal Finance',
   'settings': 'Settings',
+  'loading': 'Loading...',
   
   // Login/Register
   'welcomeBack': 'Welcome Back!',
@@ -20,6 +21,7 @@ Map<String, String> enTranslations = {
   'emailExists': 'Email already exists or registration failed',
   'dontHaveAccount': "Don't have an account? Register",
   'alreadyHaveAccount': 'Already have an account? Login',
+  'rememberMe': 'Remember me',
   
   // Navigation
   'home': 'Home',
@@ -36,6 +38,9 @@ Map<String, String> enTranslations = {
   'category': 'Category',
   'logout': 'Logout',
   'logoutConfirm': 'Are you sure you want to logout?',
+  'logoutConfirmation': 'Logout Confirmation',
+  'areYouSureLogout': 'Are you sure you want to log out?',
+  'logoutError': 'There was an error logging out. Please try again.',
   
   // Settings
   'darkMode': 'Dark Mode',

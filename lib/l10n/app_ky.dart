@@ -104,4 +104,11 @@ Map<String, String> kyTranslations = {
   'confirmDeleteTransaction': 'Бул транзакцияны өчүрүүнү каалайсызбы?',
   'transactionActions': 'Транзакция иш-аракеттери',
   'whatWouldYouLikeToDo': 'Эмне кылгыңыз келет?',
+  
+  // Add Kyrgyz translations for the new keys
+  'rememberMe': 'Мени эстеп кал',
+  'logoutConfirmation': 'Чыгуу ырастоосу',
+  'areYouSureLogout': 'Сиз чыгууну каалайсызбы?',
+  'logoutError': 'Чыгууда ката кетти. Кайталап көрүңүз.',
+  'loading': 'Жүктөлүүдө...',
 }; 

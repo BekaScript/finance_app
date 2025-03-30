@@ -103,4 +103,11 @@ Map<String, String> ruTranslations = {
   'confirmDeleteTransaction': 'Вы уверены, что хотите удалить эту транзакцию?',
   'transactionActions': 'Действия с транзакцией',
   'whatWouldYouLikeToDo': 'Что вы хотите сделать?',
+  
+  // Add Russian translations for the new keys
+  'rememberMe': 'Запомнить меня',
+  'logoutConfirmation': 'Подтверждение выхода',
+  'areYouSureLogout': 'Вы уверены, что хотите выйти?',
+  'logoutError': 'При выходе произошла ошибка. Пожалуйста, попробуйте еще раз.',
+  'loading': 'Загрузка...',
 }; 

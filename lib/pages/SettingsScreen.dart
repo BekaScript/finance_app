@@ -172,6 +172,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
+              
+              const SizedBox(height: 16),
+              const Divider(),
+              
+              // Logout Button
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.red),
+                  title: Text(
+                    _languageService.translate('logout'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: _showLogoutConfirmation,
+                ),
+              ),
             ],
           ),
         ),
@@ -188,23 +210,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _languageService.translate('selectCurrency'),
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                const Icon(Icons.currency_exchange, color: Colors.deepPurple),
+                const SizedBox(width: 8),
+                Text(
+                  _languageService.translate('selectCurrency'),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _buildCurrencyOption('USD'),
-                _buildCurrencyOption('EUR'),
-                _buildCurrencyOption('INR'),
-                _buildCurrencyOption('KGS'),
-              ],
+            DropdownButtonFormField<String>(
+              value: _selectedCurrency,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              onChanged: (String? value) {
+                if (value != null) {
+                  _showExchangeRateDialog(value);
+                }
+              },
+              items: ['USD', 'EUR', 'INR', 'KGS'].map((currency) {
+                return DropdownMenuItem<String>(
+                  value: currency,
+                  child: Row(
+                    children: [
+                      _getCurrencyIcon(currency),
+                      const SizedBox(width: 8),
+                      Text(_languageService.translate(currency)),
+                    ],
+                  ),
+                );
+              }).toList(),
             ),
           ],
         ),
@@ -212,26 +256,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // Individual currency option
-  Widget _buildCurrencyOption(String currency) {
-    final isSelected = _selectedCurrency == currency;
-    return InkWell(
-      onTap: () => _showExchangeRateDialog(currency),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.blue : Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Text(
-          _languageService.translate(currency),
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
+  // Helper to get currency icon
+  Widget _getCurrencyIcon(String currency) {
+    IconData iconData;
+    Color iconColor;
+    
+    switch (currency) {
+      case 'USD':
+        iconData = Icons.attach_money;
+        iconColor = Colors.green;
+        break;
+      case 'EUR':
+        iconData = Icons.euro;
+        iconColor = Colors.blue;
+        break;
+      case 'INR':
+        iconData = Icons.currency_rupee;
+        iconColor = Colors.orange;
+        break;
+      case 'KGS':
+        iconData = Icons.money;
+        iconColor = Colors.purple;
+        break;
+      default:
+        iconData = Icons.money;
+        iconColor = Colors.grey;
+    }
+    
+    return Icon(iconData, color: iconColor);
   }
 
   // Show exchange rate dialog when selecting currency
@@ -313,6 +365,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _selectedCurrency = currency;
     });
+  }
+
+  // Show logout confirmation dialog
+  Future<void> _showLogoutConfirmation() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(_languageService.translate('logoutConfirmation')),
+          content: Text(_languageService.translate('areYouSureLogout')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_languageService.translate('cancel')),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _logout();
+              },
+              child: Text(
+                _languageService.translate('logout'),
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // Logout user
+  Future<void> _logout() async {
+    try {
+      final db = await _dbHelper.database;
+      // Set all users as logged out
+      await db.update('user', {'is_logged_in': 0, 'remember_me': 0});
+      
+      // Navigate to login screen
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    } catch (e) {
+      print('Error logging out: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_languageService.translate('logoutError')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 
