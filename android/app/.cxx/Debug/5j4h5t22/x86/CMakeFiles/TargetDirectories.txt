@@ -1,0 +1,2 @@
+C:/FlutterProjects/finance_app/android/app/.cxx/Debug/5j4h5t22/x86/CMakeFiles/edit_cache.dir
+C:/FlutterProjects/finance_app/android/app/.cxx/Debug/5j4h5t22/x86/CMakeFiles/rebuild_cache.dir
