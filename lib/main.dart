@@ -20,7 +20,6 @@ void main() async {
     await dbHelper.database;
     await languageService.initLanguage();
     await themeService.initTheme();
-    print('Main: Initialization completed');
   } catch (e) {
     print("Error initializing: $e");
   }
@@ -39,110 +38,13 @@ class MyApp extends StatelessWidget {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeService.themeController,
       builder: (context, themeMode, child) {
-        print('MyApp: Building with theme mode: $themeMode');
         return MaterialApp(
           title: languageService.translate('personalFinance'),
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.deepPurple,
-              brightness: Brightness.light,
-            ),
-            useMaterial3: true,
-            scaffoldBackgroundColor: Colors.white,
-            textTheme: const TextTheme(
-              bodyLarge: TextStyle(color: Colors.black),
-              bodyMedium: TextStyle(color: Colors.black),
-              titleLarge: TextStyle(color: Colors.black),
-            ),
-          ),
-          darkTheme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.deepPurple,
-              brightness: Brightness.dark,
-            ),
-            useMaterial3: true,
-            scaffoldBackgroundColor: Colors.grey[900],
-            textTheme: const TextTheme(
-              bodyLarge: TextStyle(color: Colors.white),
-              bodyMedium: TextStyle(color: Colors.white),
-              titleLarge: TextStyle(color: Colors.white),
-            ),
-            cardColor: Colors.grey[800],
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Colors.deepPurple,
-              foregroundColor: Colors.white,
-            ),
-            drawerTheme: DrawerThemeData(
-              backgroundColor: Colors.grey[900],
-              scrimColor: Colors.black54,
-            ),
-            bottomNavigationBarTheme: BottomNavigationBarThemeData(
-              backgroundColor: Colors.grey[900],
-              selectedItemColor: Colors.deepPurple,
-              unselectedItemColor: Colors.grey[400],
-            ),
-            floatingActionButtonTheme: const FloatingActionButtonThemeData(
-              backgroundColor: Colors.deepPurple,
-              foregroundColor: Colors.white,
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              fillColor: Colors.grey[800],
-              filled: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Colors.deepPurple),
-              ),
-              labelStyle: const TextStyle(color: Colors.white),
-              hintStyle: TextStyle(color: Colors.grey[400]),
-            ),
-            switchTheme: SwitchThemeData(
-              thumbColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return Colors.deepPurple;
-                }
-                return Colors.grey[400];
-              }),
-              trackColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return Colors.deepPurple.withOpacity(0.5);
-                }
-                return Colors.grey[600];
-              }),
-            ),
-            dividerColor: Colors.grey[700],
-            dividerTheme: DividerThemeData(
-              color: Colors.grey[700],
-              thickness: 1,
-            ),
-            listTileTheme: ListTileThemeData(
-              textColor: Colors.white,
-              iconColor: Colors.white,
-            ),
-            cardTheme: CardTheme(
-              color: Colors.grey[800],
-              elevation: 2,
-            ),
-            dialogTheme: DialogTheme(
-              backgroundColor: Colors.grey[800],
-              titleTextStyle: const TextStyle(color: Colors.white),
-              contentTextStyle: const TextStyle(color: Colors.white),
-            ),
-            snackBarTheme: SnackBarThemeData(
-              backgroundColor: Colors.grey[800],
-              contentTextStyle: const TextStyle(color: Colors.white),
-            ),
-          ),
+          theme: _buildLightTheme(),
+          darkTheme: _buildDarkTheme(),
           themeMode: themeMode,
           debugShowCheckedModeBanner: false,
-          home: const Loginregister(), // Start with Login/Register screen
+          home: const Loginregister(),
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
@@ -155,6 +57,110 @@ class MyApp extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+  
+  ThemeData _buildLightTheme() {
+    return ThemeData(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.deepPurple,
+        brightness: Brightness.light,
+      ),
+      useMaterial3: true,
+      scaffoldBackgroundColor: Colors.white,
+      textTheme: const TextTheme(
+        bodyLarge: TextStyle(color: Colors.black),
+        bodyMedium: TextStyle(color: Colors.black),
+        titleLarge: TextStyle(color: Colors.black),
+      ),
+    );
+  }
+
+  ThemeData _buildDarkTheme() {
+    return ThemeData(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.deepPurple,
+        brightness: Brightness.dark,
+      ),
+      useMaterial3: true,
+      scaffoldBackgroundColor: Colors.grey[900],
+      textTheme: const TextTheme(
+        bodyLarge: TextStyle(color: Colors.white),
+        bodyMedium: TextStyle(color: Colors.white),
+        titleLarge: TextStyle(color: Colors.white),
+      ),
+      cardColor: Colors.grey[800],
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.deepPurple,
+        foregroundColor: Colors.white,
+      ),
+      drawerTheme: DrawerThemeData(
+        backgroundColor: Colors.grey[900],
+        scrimColor: Colors.black54,
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: Colors.grey[900],
+        selectedItemColor: Colors.deepPurple,
+        unselectedItemColor: Colors.grey[400],
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: Colors.deepPurple,
+        foregroundColor: Colors.white,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        fillColor: Colors.grey[800],
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Colors.deepPurple),
+        ),
+        labelStyle: const TextStyle(color: Colors.white),
+        hintStyle: TextStyle(color: Colors.grey[400]),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return Colors.deepPurple;
+          }
+          return Colors.grey[400];
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return Colors.deepPurple.withOpacity(0.5);
+          }
+          return Colors.grey[600];
+        }),
+      ),
+      dividerColor: Colors.grey[700],
+      dividerTheme: DividerThemeData(
+        color: Colors.grey[700],
+        thickness: 1,
+      ),
+      listTileTheme: const ListTileThemeData(
+        textColor: Colors.white,
+        iconColor: Colors.white,
+      ),
+      cardTheme: CardTheme(
+        color: Colors.grey[800],
+        elevation: 2,
+      ),
+      dialogTheme: DialogTheme(
+        backgroundColor: Colors.grey[800],
+        titleTextStyle: const TextStyle(color: Colors.white),
+        contentTextStyle: const TextStyle(color: Colors.white),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: Colors.grey[800],
+        contentTextStyle: const TextStyle(color: Colors.white),
+      ),
     );
   }
 }

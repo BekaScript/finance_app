@@ -190,15 +190,12 @@ class DatabaseHelper {
   }
 
   Future<void> setDarkMode(bool isDarkMode) async {
-    print('DatabaseHelper: Setting dark mode to: $isDarkMode');
     final db = await database;
     final List<Map<String, dynamic>> settings = await db.query('settings');
     
     if (settings.isEmpty) {
-      print('DatabaseHelper: No settings found, creating new settings');
       await db.insert('settings', {'isDarkMode': isDarkMode ? 1 : 0});
     } else {
-      print('DatabaseHelper: Updating existing settings');
       await db.update(
         'settings',
         {'isDarkMode': isDarkMode ? 1 : 0},
@@ -206,23 +203,18 @@ class DatabaseHelper {
         whereArgs: [settings.first['id']],
       );
     }
-    print('DatabaseHelper: Dark mode setting saved successfully');
   }
 
   Future<bool> getDarkMode() async {
-    print('DatabaseHelper: Getting dark mode setting');
     final db = await database;
     final List<Map<String, dynamic>> settings = await db.query('settings');
     
     if (settings.isEmpty) {
-      print('DatabaseHelper: No settings found, creating default settings');
       await db.insert('settings', {'isDarkMode': 0});
       return false;
     }
     
-    final isDarkMode = settings.first['isDarkMode'] == 1;
-    print('DatabaseHelper: Retrieved dark mode setting: $isDarkMode');
-    return isDarkMode;
+    return settings.first['isDarkMode'] == 1;
   }
 
   Future<double> getExchangeRate(String currency) async {

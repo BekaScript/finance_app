@@ -33,16 +33,21 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     dbHelper = DatabaseHelper();
-    _loadCurrency();
-    _loadData();
-    _loadUserData();
-    _loadLanguage();
+    _loadInitialData();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _loadCurrency();
+  }
+
+  // Combine all data loading methods into one
+  void _loadInitialData() {
+    _loadCurrency();
+    _loadData();
+    _loadUserData();
+    _loadLanguage();
   }
 
   // Load transactions and summary data

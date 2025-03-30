@@ -22,7 +22,6 @@ class _LoginregisterState extends State<Loginregister> {
   // Function to handle login
   Future<bool> _login(String email, String password) async {
     try {
-      print('Attempting login with email: $email');
       final db = await _dbHelper.database;
       
       // First, reset all users' logged_in status
@@ -35,9 +34,7 @@ class _LoginregisterState extends State<Loginregister> {
         whereArgs: [email, password],
       );
       
-      print('Found ${users.length} users matching credentials');
       if (users.isNotEmpty) {
-        print('User found: ${users.first}');
         // Set this user as logged in
         await db.update(
           'user',
@@ -47,7 +44,6 @@ class _LoginregisterState extends State<Loginregister> {
         );
         return true;
       }
-      print('No user found with these credentials');
       return false;
     } catch (e) {
       print('Login error: $e');
