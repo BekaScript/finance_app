@@ -6,9 +6,9 @@ plugins {
 }
 
 android {
-    namespace = "com.example.personal_finance"
-    compileSdk = 34
-    ndkVersion = flutter.ndkVersion
+    namespace "com.example.personal_finance"
+    compileSdk 35
+    ndkVersion flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

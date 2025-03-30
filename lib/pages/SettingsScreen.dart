@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/services/language_service.dart';
 import 'package:personal_finance/services/theme_service.dart';
+import 'package:personal_finance/pages/AppLockScreen.dart';
 
 
 class SettingsScreen extends StatefulWidget {
@@ -104,8 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: ListView(
             children: [
               // Theme Toggle
               Card(
@@ -123,13 +123,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
 
               const SizedBox(height: 16),
-              const Divider(),
 
               // Currency Selection
               _buildCurrencySelector(),
 
               const SizedBox(height: 16),
-              const Divider(),
 
               // Language Selection
               ListTile(
@@ -174,7 +172,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               
               const SizedBox(height: 16),
-              const Divider(),
+              
+              // App Lock Setting
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.lock, color: Colors.deepPurple),
+                  title: Text(
+                    _languageService.translate('appLock'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _languageService.translate('appLockSubtitle'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                    ),
+                  ),
+                  onTap: () => _navigateToAppLockScreen(),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
               
               // Logout Button
               Card(
@@ -196,7 +221,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               
               const SizedBox(height: 16),
-              const Divider(),
+              const Divider(), // Keep only this divider
+              const SizedBox(height: 16),
               
               // Reset Data Button
               Card(
@@ -538,6 +564,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     }
+  }
+
+  Future<void> _navigateToAppLockScreen() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AppLockScreen(),
+      ),
+    );
   }
 }
 
