@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/utils/currency_utils.dart';
 import 'package:personal_finance/services/language_service.dart';
+import 'package:intl/intl.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -15,24 +16,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final LanguageService _languageService = LanguageService();
   late Future<Map<String, dynamic>> _reportsFuture;
-  List<String> selectedCategories = [];
-  List<String> allCategories = []; // To hold all available categories
+  ChartType _chartType = ChartType.pie;
+  String selectedType = 'expense';
+  String _currencySymbol = '₹';
   DateTime? selectedStartDate;
   DateTime? selectedEndDate;
-  String selectedType = 'expense'; // Default to 'expense'
-  String _currencySymbol = '\$';
 
   @override
   void initState() {
     super.initState();
     _loadCurrency();
+
+    // Set default date range
+    final now = DateTime.now();
+    selectedStartDate = DateTime(now.year, now.month, 1); // Start of month
+    selectedEndDate = DateTime(now.year, now.month + 1, 0); // End of month
+
     _reportsFuture = _loadData();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reload currency when returning to this screen
     _loadCurrency();
   }
 
@@ -41,7 +46,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (mounted) {
       setState(() {
         _currencySymbol = getCurrencySymbol(currency);
-        // Refresh the data to update all currency displays
         _reportsFuture = _loadData();
       });
     }
@@ -51,61 +55,94 @@ class _ReportsScreenState extends State<ReportsScreen> {
     try {
       final db = await _dbHelper.database;
 
-      // Set default date range if not selected
-      final now = DateTime.now();
-      final defaultStartDate = DateTime(now.year, now.month - 2, 1); // Last 3 months by default
-      final defaultEndDate = DateTime(now.year, now.month + 1, 0); // Until end of current month
+      // First load total income and expenses for the period
+      final incomeTotal = await db.rawQuery('''
+        SELECT COALESCE(SUM(amount), 0) as total,
+               date,
+               COALESCE(SUM(amount), 0) as daily_total
+        FROM transactions 
+        WHERE type = 'income' 
+        AND date BETWEEN ? AND ?
+        GROUP BY date
+      ''', [
+        selectedStartDate!.toIso8601String().substring(0, 10),
+        selectedEndDate!.toIso8601String().substring(0, 10),
+      ]);
 
-      // Build the query based on filters
+      final expenseTotal = await db.rawQuery('''
+        SELECT COALESCE(SUM(amount), 0) as total,
+               date,
+               COALESCE(SUM(amount), 0) as daily_total
+        FROM transactions 
+        WHERE type = 'expense' 
+        AND date BETWEEN ? AND ?
+        GROUP BY date
+      ''', [
+        selectedStartDate!.toIso8601String().substring(0, 10),
+        selectedEndDate!.toIso8601String().substring(0, 10),
+      ]);
+
+      // Process daily data
+      Map<String, double> dailyIncome = {};
+      Map<String, double> dailyExpense = {};
+
+      for (var row in incomeTotal) {
+        String date = row['date'] as String;
+        dailyIncome[date] = (row['daily_total'] as num).toDouble();
+      }
+
+      for (var row in expenseTotal) {
+        String date = row['date'] as String;
+        dailyExpense[date] = (row['daily_total'] as num).toDouble();
+      }
+
+      // Load category data for selected type
       String whereClause = "type = ? AND date BETWEEN ? AND ?";
       List<dynamic> whereArgs = [
         selectedType,
-        (selectedStartDate ?? defaultStartDate).toIso8601String().substring(0, 10),
-        (selectedEndDate ?? defaultEndDate).toIso8601String().substring(0, 10),
+        selectedStartDate!.toIso8601String().substring(0, 10),
+        selectedEndDate!.toIso8601String().substring(0, 10),
       ];
-
-      if (selectedCategories.isNotEmpty) {
-        whereClause += " AND category IN (${List.filled(selectedCategories.length, '?').join(',')})";
-        whereArgs.addAll(selectedCategories);
-      }
 
       final transactions = await db.query(
         'transactions',
-        where: whereClause, 
+        where: whereClause,
         whereArgs: whereArgs,
-        orderBy: 'date DESC',
+        orderBy: 'amount DESC', // Order by amount to show highest first
       );
 
       Map<String, double> categoryData = {};
-      Map<String, double> monthlyData = {};
+      double typeTotal = 0;
 
-      // Collecting all unique categories for filtering
-      Set<String> uniqueCategories = {};
-      
       for (var transaction in transactions) {
         String category = transaction['category'] as String;
         double amount = (transaction['amount'] as num).toDouble();
-        String dateString = transaction['date'] as String;
-
-        // Add category to unique categories
-        uniqueCategories.add(category);
-
-        // Process data for charts
-        if (dateString.length >= 7) {
-          String month = dateString.substring(0, 7);
-          if (selectedCategories.isEmpty || selectedCategories.contains(category)) {
-            categoryData[category] = (categoryData[category] ?? 0) + amount;
-            monthlyData[month] = (monthlyData[month] ?? 0) + amount;
-          }
-        }
+        categoryData[category] = (categoryData[category] ?? 0) + amount;
+        typeTotal += amount;
       }
 
-      // Update allCategories list
-      allCategories = uniqueCategories.toList();
+      // Calculate percentages only if there is data
+      Map<String, double> categoryPercentages = {};
+      if (typeTotal > 0) {
+        categoryData.forEach((key, value) {
+          categoryPercentages[key] = (value / typeTotal) * 100;
+        });
+      }
 
       return {
-        "categorySpending": categoryData,
-        "monthlySpending": monthlyData,
+        "categoryData": categoryData,
+        "categoryPercentages": categoryPercentages,
+        "total": typeTotal,
+        "incomeTotal": (incomeTotal.isEmpty
+            ? 0
+            : incomeTotal.fold(0.0,
+                (sum, row) => sum + (row['daily_total'] as num).toDouble())),
+        "expenseTotal": (expenseTotal.isEmpty
+            ? 0
+            : expenseTotal.fold(0.0,
+                (sum, row) => sum + (row['daily_total'] as num).toDouble())),
+        "dailyIncome": dailyIncome,
+        "dailyExpense": dailyExpense,
       };
     } catch (e) {
       throw Exception("Failed to load data: $e");
@@ -115,551 +152,851 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _languageService.translate('reports'),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1A237E), Color(0xFF64B5F6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-      ),
       body: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark 
-              ? Colors.black.withAlpha(179)
-              : Colors.white.withAlpha(179),
-        ),
-        child: FutureBuilder<Map<String, dynamic>>(
-          future: _reportsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
-                ),
-              );
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Text(
-                  "Failed to load data: ${snapshot.error}",
-                  style: const TextStyle(color: Colors.red, fontSize: 16),
-                ),
-              );
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(
-                child: Text(
-                  "No data available",
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-              );
-            }
-
-            final categorySpending =
-                snapshot.data!["categorySpending"] as Map<String, double>;
-            final monthlySpending =
-                snapshot.data!["monthlySpending"] as Map<String, double>;
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildFilters(),
-                  const SizedBox(height: 20),
-                  _buildChartCard(
-                    title: _languageService.translate('categoryWiseSpending'),
-                    child: categorySpending.isEmpty
-                        ? _buildNoDataWidget()
-                        : Column(
-                            children: [
-                              _buildLegend(categorySpending),
-                              const SizedBox(height: 20),
-                              Container(
-                                height: 250,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                                child: PieChart(
-                                  PieChartData(
-                                    sectionsSpace: 2,
-                                    centerSpaceRadius: 35,
-                                    sections: categorySpending.entries.map((entry) {
-                                      final color = _getChartColor(entry.key);
-                                      return PieChartSectionData(
-                                        value: entry.value,
-                                        title: '',
-                                        radius: 60,
-                                        titleStyle: const TextStyle(fontSize: 0),
-                                        color: color,
-                                        badgeWidget: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            border: Border.all(color: color, width: 1),
-                                            borderRadius: BorderRadius.circular(4),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(0.1),
-                                                spreadRadius: 1,
-                                                blurRadius: 2,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                            ],
-                                          ),
-                                          child: Text(
-                                            '${_languageService.translate(entry.key)}\n$_currencySymbol${entry.value.toStringAsFixed(0)}',
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              color: Colors.black,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        badgePositionPercentageOffset: 1.5,
-                                        showTitle: false,
-                                      );
-                                    }).toList(),
-                                    pieTouchData: PieTouchData(enabled: false),
-                                    borderData: FlBorderData(show: false),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                          ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildChartCard(
-                    title: _languageService.translate(selectedType == 'income' ? 'monthlyIncome' : 'monthlyExpenses'),
-                    child: monthlySpending.isEmpty
-                        ? _buildNoDataWidget()
-                        : SizedBox(
-                            height: 250,
-                            child: BarChart(
-                              BarChartData(
-                                barGroups: monthlySpending.entries.map((entry) {
-                                  return BarChartGroupData(
-                                    x: int.parse(entry.key.split('-')[1]),
-                                    barRods: [
-                                      BarChartRodData(
-                                        toY: entry.value,
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.blueAccent,
-                                            Colors.purpleAccent,
-                                          ],
-                                          begin: Alignment.bottomCenter,
-                                          end: Alignment.topCenter,
-                                        ),
-                                        width: 16,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ],
-                                  );
-                                }).toList(),
-                                titlesData: FlTitlesData(
-                                  bottomTitles: AxisTitles(
-                                    sideTitles: SideTitles(
-                                      showTitles: true,
-                                      getTitlesWidget: (value, meta) {
-                                        return Text(
-                                          _getMonthLabel(value.toInt()),
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.black87,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  leftTitles: AxisTitles(
-                                    sideTitles: SideTitles(
-                                      showTitles: true,
-                                      reservedSize: 60,
-                                      interval: null,
-                                      getTitlesWidget: (value, meta) {
-                                        double maxValue = monthlySpending.values.reduce((max, value) => max > value ? max : value);
-                                        double interval = _calculateInterval(maxValue);
-                                        
-                                        if (value % interval != 0) return const SizedBox.shrink();
-                                        
-                                        String text = '';
-                                        if (value >= 1000000) {
-                                          text = '$_currencySymbol${(value/1000000).toStringAsFixed(1)}M';
-                                        } else if (value >= 1000) {
-                                          text = '$_currencySymbol${(value/1000).toStringAsFixed(1)}K';
-                                        } else {
-                                          text = '$_currencySymbol${value.toInt()}';
-                                        }
-                                        return Text(
-                                          text,
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.grey,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  topTitles: AxisTitles(
-                                    sideTitles: SideTitles(
-                                      showTitles: true,
-                                      getTitlesWidget: (value, meta) {
-                                        double maxValue = monthlySpending.values.reduce((max, value) => max > value ? max : value);
-                                        double interval = _calculateInterval(maxValue);
-                                        
-                                        if (value % interval != 0) return const SizedBox.shrink();
-                                        
-                                        String text = '';
-                                        if (value >= 1000000) {
-                                          text = '$_currencySymbol${(value/1000000).toStringAsFixed(1)}M';
-                                        } else if (value >= 1000) {
-                                          text = '$_currencySymbol${(value/1000).toStringAsFixed(1)}K';
-                                        } else {
-                                          text = '$_currencySymbol${value.toInt()}';
-                                        }
-                                        return Text(
-                                          text,
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.grey,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  rightTitles: AxisTitles(
-                                    sideTitles: SideTitles(showTitles: false)
-                                  ),
-                                ),
-                                borderData: FlBorderData(show: false),
-                                gridData: FlGridData(
-                                  show: true,
-                                  drawVerticalLine: false,
-                                  horizontalInterval: _calculateInterval(
-                                    monthlySpending.values.reduce((max, value) => max > value ? max : value)
-                                  ),
-                                  getDrawingHorizontalLine: (value) {
-                                    return FlLine(
-                                      color: Colors.grey.withOpacity(0.2),
-                                      strokeWidth: 1,
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
+        color: Theme.of(context).colorScheme.background,
+        child: Column(
+          children: [
+            // Header with date range and chart toggle
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
                   ),
                 ],
               ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  // Build the filter section
-  Widget _buildFilters() {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _languageService.translate('filters'),
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: theme.textTheme.bodyLarge?.color,
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Financial Report',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.pie_chart),
+                            color: _chartType == ChartType.pie
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.5),
+                            onPressed: () {
+                              setState(() {
+                                _chartType = ChartType.pie;
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.bar_chart),
+                            color: _chartType == ChartType.bar
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.5),
+                            onPressed: () {
+                              setState(() {
+                                _chartType = ChartType.bar;
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.calendar_today),
+                            onPressed: () async {
+                              final DateTimeRange? dateRange =
+                                  await showDateRangePicker(
+                                context: context,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime.now(),
+                                initialDateRange: DateTimeRange(
+                                  start: selectedStartDate!,
+                                  end: selectedEndDate!,
+                                ),
+                                builder: (context, child) {
+                                  return Theme(
+                                    data: Theme.of(context).copyWith(
+                                      colorScheme: ColorScheme.light(
+                                        primary: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      ),
+                                    ),
+                                    child: child!,
+                                  );
+                                },
+                              );
+                              if (dateRange != null) {
+                                setState(() {
+                                  selectedStartDate = dateRange.start;
+                                  selectedEndDate = dateRange.end;
+                                  _reportsFuture = _loadData();
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${DateFormat('MMM d, y').format(selectedStartDate!)} - ${DateFormat('MMM d, y').format(selectedEndDate!)}',
+                    style: TextStyle(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            _buildTypeFilter(),
-            const SizedBox(height: 12),
-            _buildDateRangeFilter(),
-            const SizedBox(height: 12),
-            _buildCategoryFilter(),
+
+            // Main content
+            Expanded(
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: _reportsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                      child: CircularProgressIndicator(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    );
+                  }
+                  if (!snapshot.hasData || snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'No data available',
+                        style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.6),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final data = snapshot.data!;
+                  final categoryData =
+                      data['categoryData'] as Map<String, double>;
+                  final categoryPercentages =
+                      data['categoryPercentages'] as Map<String, double>;
+                  final incomeTotal = data['incomeTotal'] as double;
+                  final expenseTotal = data['expenseTotal'] as double;
+                  final dailyIncome =
+                      data['dailyIncome'] as Map<String, double>;
+                  final dailyExpense =
+                      data['dailyExpense'] as Map<String, double>;
+                  final total =
+                      selectedType == 'income' ? incomeTotal : expenseTotal;
+
+                  return Column(
+                    children: [
+                      // Summary Cards
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            // Income Card
+                            Expanded(
+                              child: _buildSummaryCard(
+                                context,
+                                title: 'Income',
+                                amount: incomeTotal,
+                                color: Colors.green,
+                                icon: Icons.arrow_upward,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Expense Card
+                            Expanded(
+                              child: _buildSummaryCard(
+                                context,
+                                title: 'Expenses',
+                                amount: expenseTotal,
+                                color: Colors.red,
+                                icon: Icons.arrow_downward,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Chart Section
+                      Container(
+                        height: 280,
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 6,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: _buildChartSection(
+                            context,
+                            chartType: _chartType,
+                            categoryData: categoryData,
+                            categoryPercentages: categoryPercentages,
+                            dailyIncome: dailyIncome,
+                            dailyExpense: dailyExpense,
+                            total: total,
+                          ),
+                        ),
+                      ),
+
+                      // Type Selector
+                      Container(
+                        margin: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                style: TextButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  backgroundColor: selectedType == 'income'
+                                      ? Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer
+                                      : Colors.transparent,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    selectedType = 'income';
+                                    _reportsFuture = _loadData();
+                                  });
+                                },
+                                child: Text(
+                                  'Income',
+                                  style: TextStyle(
+                                    color: selectedType == 'income'
+                                        ? Theme.of(context)
+                                            .colorScheme
+                                            .onPrimaryContainer
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: TextButton(
+                                style: TextButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  backgroundColor: selectedType == 'expense'
+                                      ? Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer
+                                      : Colors.transparent,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    selectedType = 'expense';
+                                    _reportsFuture = _loadData();
+                                  });
+                                },
+                                child: Text(
+                                  'Expenses',
+                                  style: TextStyle(
+                                    color: selectedType == 'expense'
+                                        ? Theme.of(context)
+                                            .colorScheme
+                                            .onPrimaryContainer
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Category List Header
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Categories',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              'Total: $_currencySymbol${total.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Category list
+                      Expanded(
+                        child: categoryData.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No ${selectedType} data for selected period',
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.6),
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                itemCount: categoryData.length,
+                                itemBuilder: (context, index) {
+                                  final entry =
+                                      categoryData.entries.elementAt(index);
+                                  final percentage =
+                                      categoryPercentages[entry.key] ?? 0;
+                                  return _buildCategoryItem(
+                                    context,
+                                    category: entry.key,
+                                    amount: entry.value,
+                                    percentage: percentage,
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // Type filter (expense/income)
-  Widget _buildTypeFilter() {
-    return DropdownButtonFormField<String>(
-      value: selectedType,
-      decoration: InputDecoration(
-        labelText: _languageService.translate('type'),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+  Widget _buildSummaryCard(
+    BuildContext context, {
+    required String title,
+    required double amount,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      items: [
-        DropdownMenuItem(value: 'expense', child: Text(_languageService.translate('expenses'))),
-        DropdownMenuItem(value: 'income', child: Text(_languageService.translate('income'))),
-      ],
-      onChanged: (value) {
-        setState(() {
-          selectedType = value!;
-          _reportsFuture = _loadData(); // Refresh data
-        });
-      },
-    );
-  }
-
-  // Date range filter
-  Widget _buildDateRangeFilter() {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: TextButton(
-            onPressed: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: selectedStartDate ?? DateTime.now(),
-                firstDate: DateTime(2000),
-                lastDate: DateTime.now(),
-              );
-              if (date != null) {
-                setState(() {
-                  selectedStartDate = date;
-                  _reportsFuture = _loadData(); // Refresh data
-                });
-              }
-            },
-            child: Text(
-              selectedStartDate == null
-                  ? _languageService.translate('selectStartDate')
-                  : 'Start: ${selectedStartDate!.toLocal().toString().split(' ')[0]}',
-              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: TextButton(
-            onPressed: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: selectedEndDate ?? DateTime.now(),
-                firstDate: DateTime(2000),
-                lastDate: DateTime.now(),
-              );
-              if (date != null) {
-                setState(() {
-                  selectedEndDate = date;
-                  _reportsFuture = _loadData(); // Refresh data
-                });
-              }
-            },
-            child: Text(
-              selectedEndDate == null
-                  ? _languageService.translate('selectEndDate')
-                  : 'End: ${selectedEndDate!.toLocal().toString().split(' ')[0]}',
-              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Category filter
-  Widget _buildCategoryFilter() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _languageService.translate('filterByCategory'),
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: allCategories.map((category) {
-            return FilterChip(
-              label: Text(_languageService.translate(category)),
-              selected: selectedCategories.contains(category),
-              onSelected: (isSelected) {
-                setState(() {
-                  if (isSelected) {
-                    selectedCategories.add(category);
-                  } else {
-                    selectedCategories.remove(category);
-                  }
-                  _reportsFuture = _loadData();
-                });
-              },
-              selectedColor: Colors.blueAccent,
-              backgroundColor: Colors.grey[200],
-              labelStyle: TextStyle(
-                color: selectedCategories.contains(category)
-                    ? Colors.white
-                    : Colors.black87,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: color,
+                ),
               ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$_currencySymbol${amount.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartSection(
+    BuildContext context, {
+    required ChartType chartType,
+    required Map<String, double> categoryData,
+    required Map<String, double> categoryPercentages,
+    required Map<String, double> dailyIncome,
+    required Map<String, double> dailyExpense,
+    required double total,
+  }) {
+    if (chartType == ChartType.pie) {
+      if (categoryData.isEmpty) {
+        return Center(
+          child: Text(
+            'No ${selectedType} data for selected period',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        );
+      }
+
+      return PieChart(
+        PieChartData(
+          sectionsSpace: 2,
+          centerSpaceRadius: 60,
+          sections: categoryData.entries.map((entry) {
+            final percentage = categoryPercentages[entry.key] ?? 0;
+            return PieChartSectionData(
+              color: _getCategoryColor(entry.key),
+              value: entry.value,
+              title: percentage >= 5 ? '${percentage.toStringAsFixed(1)}%' : '',
+              radius: 24,
+              titleStyle: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 2,
+                  ),
+                ],
+              ),
+              badgeWidget: percentage >= 10
+                  ? _buildCategoryBadge(entry.key, percentage)
+                  : null,
+              badgePositionPercentageOffset: 1.1,
             );
           }).toList(),
+          pieTouchData: PieTouchData(
+            touchCallback: (FlTouchEvent event, pieTouchResponse) {},
+            enabled: true,
+          ),
         ),
-      ],
-    );
-  }
-
-  // Build a card for charts
-  Widget _buildChartCard({required String title, required Widget child}) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: theme.textTheme.bodyLarge?.color,
+      );
+    } else {
+      // Bar chart
+      return BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceBetween,
+          maxY: [
+                ...dailyIncome.values,
+                ...dailyExpense.values,
+              ].reduce((max, value) => value > max ? value : max) *
+              1.2,
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  final allDates = {...dailyIncome.keys, ...dailyExpense.keys}
+                      .toList()
+                    ..sort();
+                  if (value.toInt() >= 0 && value.toInt() < allDates.length) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        DateFormat('MMM d')
+                            .format(DateTime.parse(allDates[value.toInt()])),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.6),
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox();
+                },
+                reservedSize: 30,
               ),
             ),
-            const SizedBox(height: 10),
-            child,
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  return Text(
+                    '$_currencySymbol${value.toInt()}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.6),
+                    ),
+                  );
+                },
+                reservedSize: 40,
+              ),
+            ),
+            rightTitles: AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (value) {
+              return FlLine(
+                color: Theme.of(context).dividerColor,
+                strokeWidth: 0.5,
+              );
+            },
+          ),
+          borderData: FlBorderData(show: false),
+          barGroups: _createBarGroups(dailyIncome, dailyExpense),
+          barTouchData: BarTouchData(
+            enabled: true,
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (barGroup) =>
+                  Theme.of(context).colorScheme.surface,
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final date = {...dailyIncome.keys, ...dailyExpense.keys}
+                    .toList()[group.x.toInt()];
+                return BarTooltipItem(
+                  '${DateFormat('MMM d, y').format(DateTime.parse(date))}\n',
+                  TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  children: [
+                    TextSpan(
+                      text:
+                          'Income: $_currencySymbol${dailyIncome[date]?.toStringAsFixed(0) ?? '0'}',
+                      style: TextStyle(
+                        color: Colors.green,
+                      ),
+                    ),
+                    const TextSpan(text: '\n'),
+                    TextSpan(
+                      text:
+                          'Expense: $_currencySymbol${dailyExpense[date]?.toStringAsFixed(0) ?? '0'}',
+                      style: TextStyle(
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildCategoryItem(
+    BuildContext context, {
+    required String category,
+    required double amount,
+    required double percentage,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 2,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: _getCategoryColor(category).withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Icon(
+              _getCategoryIcon(category),
+              size: 20,
+              color: _getCategoryColor(category),
+            ),
+          ),
+        ),
+        title: Text(
+          category,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        subtitle: LinearProgressIndicator(
+          value: percentage / 100,
+          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          color: _getCategoryColor(category),
+          minHeight: 4,
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '$_currencySymbol${amount.toStringAsFixed(0)}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            Text(
+              '${percentage.toStringAsFixed(1)}%',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // Widget to display when no data is available
-  Widget _buildNoDataWidget() {
-    final theme = Theme.of(context);
-    return Center(
+  Widget _buildCategoryBadge(String category, double percentage) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
       child: Text(
-        _languageService.translate('noDataForFilters'),
+        category,
         style: TextStyle(
-          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
-          fontSize: 16,
+          color: Colors.black87,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
-  // Build a legend for the pie chart
-  Widget _buildLegend(Map<String, double> data) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 8,
-        alignment: WrapAlignment.center,
-        children: data.entries.map((entry) {
-          final color = _getChartColor(entry.key);
-          return Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _languageService.translate(entry.key),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.textTheme.bodyMedium?.color,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  // Get month label for bar chart
-  String _getMonthLabel(int month) {
-    final months = [
-      _languageService.translate('january'),
-      _languageService.translate('february'),
-      _languageService.translate('march'),
-      _languageService.translate('april'),
-      _languageService.translate('may'),
-      _languageService.translate('june'),
-      _languageService.translate('july'),
-      _languageService.translate('august'),
-      _languageService.translate('september'),
-      _languageService.translate('october'),
-      _languageService.translate('november'),
-      _languageService.translate('december'),
+  Color _getCategoryColor(String category) {
+    // Predefined colors list for dynamic assignment
+    final List<Color> colorPalette = [
+      const Color(0xFF2196F3), // Blue
+      const Color(0xFFFF9800), // Orange
+      const Color(0xFFE91E63), // Pink
+      const Color(0xFF4CAF50), // Green
+      const Color(0xFF9C27B0), // Purple
+      const Color(0xFF00BCD4), // Cyan
+      const Color(0xFFF44336), // Red
+      const Color(0xFF795548), // Brown
+      const Color(0xFF009688), // Teal
+      const Color(0xFF673AB7), // Deep Purple
+      const Color(0xFFFF5722), // Deep Orange
+      const Color(0xFF3F51B5), // Indigo
     ];
-    return months[month - 1];
+
+    // Generate a consistent index for the category based on its name
+    final int colorIndex = category.hashCode.abs() % colorPalette.length;
+    return colorPalette[colorIndex];
   }
 
-  // Get a unique color for each category
-  Color _getChartColor(String category) {
-    // Map of distinct colors for each category
-    final Map<String, Color> categoryColors = {
-      'Food': const Color(0xFF2196F3),      // Blue
-      'Transport': const Color(0xFFF44336),  // Red
-      'Shopping': const Color(0xFF4CAF50),   // Green
-      'Bills': const Color(0xFFFF9800),      // Orange
-      'Others': const Color(0xFF9C27B0),     // Purple
+  IconData _getCategoryIcon(String category) {
+    // Common words to icon mappings
+    final Map<String, IconData> commonIconMappings = {
+      'food': Icons.restaurant,
+      'meal': Icons.restaurant,
+      'restaurant': Icons.restaurant,
+      'grocery': Icons.shopping_basket,
+      'transport': Icons.directions_car,
+      'taxi': Icons.local_taxi,
+      'car': Icons.directions_car,
+      'bus': Icons.directions_bus,
+      'entertainment': Icons.movie,
+      'movie': Icons.movie,
+      'game': Icons.games,
+      'medicine': Icons.local_hospital,
+      'health': Icons.health_and_safety,
+      'hospital': Icons.local_hospital,
+      'shopping': Icons.shopping_cart,
+      'internet': Icons.wifi,
+      'wifi': Icons.wifi,
+      'web': Icons.language,
+      'bill': Icons.receipt,
+      'bills': Icons.receipt,
+      'invoice': Icons.receipt_long,
+      'education': Icons.school,
+      'study': Icons.school,
+      'course': Icons.cast_for_education,
+      'house': Icons.home,
+      'home': Icons.home,
+      'rent': Icons.house,
+      'insurance': Icons.security,
+      'utility': Icons.power,
+      'utilities': Icons.power,
+      'electricity': Icons.electric_bolt,
+      'water': Icons.water_drop,
+      'salary': Icons.account_balance_wallet,
+      'wage': Icons.account_balance_wallet,
+      'income': Icons.attach_money,
+      'investment': Icons.trending_up,
+      'stock': Icons.show_chart,
+      'crypto': Icons.currency_bitcoin,
+      'freelance': Icons.work,
+      'business': Icons.business,
+      'dividend': Icons.pie_chart,
+      'interest': Icons.percent,
+      'bonus': Icons.star,
+      'gift': Icons.card_giftcard,
+      'present': Icons.card_giftcard,
+      'phone': Icons.phone_android,
+      'mobile': Icons.phone_android,
+      'clothing': Icons.checkroom,
+      'clothes': Icons.checkroom,
+      'travel': Icons.flight,
+      'holiday': Icons.beach_access,
+      'vacation': Icons.beach_access,
+      'sport': Icons.sports,
+      'fitness': Icons.fitness_center,
+      'gym': Icons.fitness_center,
+      'pet': Icons.pets,
+      'beauty': Icons.face,
+      'cosmetics': Icons.face,
+      'book': Icons.book,
+      'subscription': Icons.subscriptions,
+      'donation': Icons.volunteer_activism,
+      'charity': Icons.volunteer_activism,
+      'tax': Icons.account_balance,
+      'other': Icons.more_horiz,
+      'others': Icons.more_horiz,
+      'miscellaneous': Icons.more_horiz,
     };
 
-    return categoryColors[category] ?? Colors.grey; // Default to grey if category not found
-  }
+    // Convert category to lowercase for matching
+    final String lowercaseCategory = category.toLowerCase();
 
-  Color _getRandomColor() {
-    // Implement your logic to generate a random color
-    // This is a placeholder and should be replaced with actual implementation
-    return Colors.blueAccent;
-  }
-
-  double _calculateInterval(double maxValue) {
-    if (maxValue >= 1000000) {
-      return 1000000; // Show in millions
-    } else if (maxValue >= 100000) {
-      return 20000; // Show in 20K intervals
-    } else if (maxValue >= 10000) {
-      return 2000; // Show in 2K intervals
-    } else if (maxValue >= 1000) {
-      return 500; // Show in 500 intervals
-    } else {
-      return 100; // Show in 100 intervals
+    // Try to find a matching icon based on category words
+    for (var entry in commonIconMappings.entries) {
+      if (lowercaseCategory.contains(entry.key)) {
+        return entry.value;
+      }
     }
+
+    // If no specific match found, use a generic icon based on type
+    if (selectedType == 'income') {
+      return Icons.attach_money;
+    }
+
+    // Default icon for expenses
+    return Icons.shopping_bag;
   }
+
+  List<BarChartGroupData> _createBarGroups(
+      Map<String, double> dailyIncome, Map<String, double> dailyExpense) {
+    final allDates = {...dailyIncome.keys, ...dailyExpense.keys}.toList()
+      ..sort();
+
+    return List.generate(allDates.length, (index) {
+      final date = allDates[index];
+      final income = dailyIncome[date] ?? 0;
+      final expense = dailyExpense[date] ?? 0;
+
+      return BarChartGroupData(
+        x: index,
+        groupVertically: true,
+        barRods: [
+          BarChartRodData(
+            toY: income,
+            color: Colors.green.withOpacity(0.7),
+            width: 8,
+            borderRadius: BorderRadius.zero,
+          ),
+          BarChartRodData(
+            toY: expense,
+            color: Colors.red.withOpacity(0.7),
+            width: 8,
+            borderRadius: BorderRadius.zero,
+          ),
+        ],
+      );
+    });
+  }
+}
+
+enum ChartType {
+  pie,
+  bar,
 }
