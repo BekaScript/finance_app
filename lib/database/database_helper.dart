@@ -606,4 +606,31 @@ class DatabaseHelper {
       return false;
     }
   }
+
+  // Reset all transaction data while preserving categories
+  Future<bool> resetTransactionData() async {
+    final db = await database;
+    try {
+      return await db.transaction((txn) async {
+        // 1. Delete all transactions
+        await txn.delete('transactions');
+        
+        // 2. Reset all wallet balances to zero
+        final wallets = await txn.query('wallets');
+        for (var wallet in wallets) {
+          await txn.update(
+            'wallets',
+            {'balance': 0.0},
+            where: 'id = ?',
+            whereArgs: [wallet['id']],
+          );
+        }
+        
+        return true;
+      });
+    } catch (e) {
+      print('Error resetting transaction data: $e');
+      return false;
+    }
+  }
 }

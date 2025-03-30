@@ -52,6 +52,14 @@ Map<String, String> ruTranslations = {
   'INR': 'Индийская рупия',
   'KGS': 'Кыргызский сом',
   'languageUpdated': 'Язык обновлен',
+  'resetData': 'Сбросить данные',
+  'resetDataDescription': 'Это очистит все транзакции и обнулит балансы кошельков',
+  'resetDataConfirmation': 'Подтверждение сброса данных',
+  'areYouSureResetData': 'Вы уверены, что хотите сбросить все данные о транзакциях? Это действие нельзя отменить.',
+  'reset': 'Сбросить',
+  'resetDataSuccess': 'Данные успешно сброшены',
+  'resetDataError': 'Ошибка при сбросе данных. Пожалуйста, попробуйте еще раз.',
+  'resettingData': 'Сброс данных...',
   
   // Categories
   'Food': 'Еда',

@@ -194,6 +194,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: _showLogoutConfirmation,
                 ),
               ),
+              
+              const SizedBox(height: 16),
+              const Divider(),
+              
+              // Reset Data Button
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.restore, color: Colors.orange),
+                  title: Text(
+                    _languageService.translate('resetData'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _languageService.translate('resetDataDescription'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                    ),
+                  ),
+                  onTap: _showResetConfirmation,
+                ),
+              ),
             ],
           ),
         ),
@@ -413,6 +442,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_languageService.translate('logoutError')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Show reset confirmation dialog
+  Future<void> _showResetConfirmation() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(_languageService.translate('resetDataConfirmation')),
+          content: Text(_languageService.translate('areYouSureResetData')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_languageService.translate('cancel')),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _resetData();
+              },
+              child: Text(
+                _languageService.translate('reset'),
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // Reset data
+  Future<void> _resetData() async {
+    try {
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const SizedBox(
+                  height: 20, width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(_languageService.translate('resettingData')),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      // Call the database helper reset method
+      final success = await _dbHelper.resetTransactionData();
+      
+      if (mounted) {
+        if (success) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_languageService.translate('resetDataSuccess')),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_languageService.translate('resetDataError')),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error resetting data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_languageService.translate('resetDataError')),
             backgroundColor: Colors.red,
           ),
         );

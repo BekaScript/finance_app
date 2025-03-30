@@ -57,6 +57,14 @@ Map<String, String> enTranslations = {
   'INR': 'Indian Rupee',
   'KGS': 'Kyrgyzstani Som',
   'languageUpdated': 'Language Updated',
+  'resetData': 'Reset Data',
+  'resetDataDescription': 'This will clear all transactions and reset wallet balances',
+  'resetDataConfirmation': 'Reset Data Confirmation',
+  'areYouSureResetData': 'Are you sure you want to reset all transaction data? This cannot be undone.',
+  'reset': 'Reset',
+  'resetDataSuccess': 'Data reset successful',
+  'resetDataError': 'Error resetting data. Please try again.',
+  'resettingData': 'Resetting data...',
   
   // Categories
   'Food': 'Food',
