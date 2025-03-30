@@ -34,11 +34,23 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   }
 
   Future<void> _loadTransactions() async {
-    final db = await _dbHelper.database;
-    final transactions = await db.query('transactions', orderBy: 'date DESC');
-    setState(() {
-      _transactions = transactions;
-    });
+    try {
+      final transactions = await _dbHelper.getTransactions();
+      
+      print("Загружено ${transactions.length} транзакций в историю транзакций");
+      if (transactions.isNotEmpty) {
+        print("Первая транзакция: ${transactions.first}");
+      }
+      
+      setState(() {
+        _transactions = transactions;
+      });
+    } catch (e) {
+      print("Ошибка при загрузке транзакций: $e");
+      setState(() {
+        _transactions = [];
+      });
+    }
   }
 
   Future<void> _loadCurrency() async {

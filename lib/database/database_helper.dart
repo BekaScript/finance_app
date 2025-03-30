@@ -16,9 +16,12 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), 'finance.db');
+    
+    // Не удаляем базу данных, а просто открываем или создаем её
+    print("Открываем или создаем базу данных: $path");
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -34,6 +37,7 @@ class DatabaseHelper {
         date TEXT,
         description TEXT,
         wallet_id INTEGER,
+        user_id INTEGER,
         isRecurring INTEGER
       )
     ''');
@@ -50,7 +54,9 @@ class DatabaseHelper {
       CREATE TABLE wallets(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
-        balance REAL DEFAULT 0.0
+        balance REAL DEFAULT 0.0,
+        type TEXT,
+        user_id INTEGER
       )
     ''');
 
@@ -66,7 +72,7 @@ class DatabaseHelper {
       CREATE TABLE user(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
-        email TEXT,
+        email TEXT UNIQUE,
         password TEXT,
         is_logged_in INTEGER DEFAULT 0,
         remember_me INTEGER DEFAULT 0
@@ -124,10 +130,54 @@ class DatabaseHelper {
         print('Column might already exist: $e');
       }
     }
+    
+    if (oldVersion < 3) {
+      try {
+        // Проверяем существование таблицы user
+        final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='user'");
+        
+        if (tables.isNotEmpty) {
+          // Создаем временную таблицу
+          await db.execute('''
+            CREATE TABLE user_temp(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT,
+              email TEXT UNIQUE,
+              password TEXT,
+              is_logged_in INTEGER DEFAULT 0,
+              remember_me INTEGER DEFAULT 0
+            )
+          ''');
+          
+          // Копируем данные из старой таблицы, игнорируя дубликаты
+          await db.execute('''
+            INSERT OR IGNORE INTO user_temp(id, name, email, password, is_logged_in, remember_me)
+            SELECT id, name, email, password, is_logged_in, remember_me FROM user
+          ''');
+          
+          // Удаляем старую таблицу
+          await db.execute('DROP TABLE user');
+          
+          // Переименовываем временную таблицу
+          await db.execute('ALTER TABLE user_temp RENAME TO user');
+          
+          print('Успешно обновлена таблица user с уникальным ограничением на email');
+        }
+      } catch (e) {
+        print('Ошибка при обновлении таблицы user: $e');
+      }
+    }
   }
 
   Future<int> insertTransaction(Map<String, dynamic> transaction) async {
     final db = await database;
+    final int? userId = await getCurrentUserId();
+    
+    // Add userId to transaction if user is logged in
+    if (userId != null) {
+      transaction['user_id'] = userId;
+    }
+    
     final id = await db.insert('transactions', transaction);
     
     // Update wallet balance
@@ -456,18 +506,47 @@ class DatabaseHelper {
   }
   
   Future<List<Map<String, dynamic>>> getAllWallets() async {
-    final db = await database;
-    return await db.query('wallets');
+    try {
+      await _ensureWalletsTableExists();
+      final db = await database;
+      final int? userId = await getCurrentUserId();
+      
+      if (userId != null) {
+        // Получаем кошельки текущего пользователя
+        return await db.query(
+          'wallets',
+          where: 'user_id = ?',
+          whereArgs: [userId]
+        );
+      } else {
+        // В гостевом режиме получаем кошельки без user_id
+        return await db.query(
+          'wallets',
+          where: 'user_id IS NULL'
+        );
+      }
+    } catch (e) {
+      print("Ошибка при получении кошельков: $e");
+      return [];
+    }
   }
   
   Future<int> insertWallet(Map<String, dynamic> wallet) async {
     try {
       print("Inserting wallet: $wallet");
+      await _ensureWalletsTableExists();
       final db = await database;
+      
+      // Добавляем user_id, если пользователь авторизован
+      final int? userId = await getCurrentUserId();
+      if (userId != null) {
+        wallet['user_id'] = userId;
+      }
+      
       return await db.insert('wallets', wallet);
     } catch (e) {
       print("Error inserting wallet: $e");
-      throw e;
+      rethrow;
     }
   }
   
@@ -607,16 +686,45 @@ class DatabaseHelper {
     }
   }
 
-  // Reset all transaction data while preserving categories
+  // Сброс данных транзакций только для текущего пользователя
   Future<bool> resetTransactionData() async {
     final db = await database;
     try {
       return await db.transaction((txn) async {
-        // 1. Delete all transactions
-        await txn.delete('transactions');
+        // Получаем ID текущего пользователя
+        final int? userId = await getCurrentUserId();
         
-        // 2. Reset all wallet balances to zero
-        final wallets = await txn.query('wallets');
+        if (userId != null) {
+          // Удаляем только транзакции текущего пользователя
+          await txn.delete(
+            'transactions',
+            where: 'user_id = ?',
+            whereArgs: [userId]
+          );
+        } else {
+          // В гостевом режиме удаляем только транзакции без user_id
+          await txn.delete(
+            'transactions',
+            where: 'user_id IS NULL'
+          );
+        }
+        
+        // Получаем кошельки текущего пользователя
+        final List<Map<String, dynamic>> wallets;
+        if (userId != null) {
+          wallets = await txn.query(
+            'wallets',
+            where: 'user_id = ?',
+            whereArgs: [userId]
+          );
+        } else {
+          wallets = await txn.query(
+            'wallets',
+            where: 'user_id IS NULL'
+          );
+        }
+        
+        // Сбрасываем баланс кошельков
         for (var wallet in wallets) {
           await txn.update(
             'wallets',
@@ -631,6 +739,325 @@ class DatabaseHelper {
     } catch (e) {
       print('Error resetting transaction data: $e');
       return false;
+    }
+  }
+
+  // Метод для полного разделения данных между пользователями
+  Future<void> _ensureUserDataSeparation() async {
+    final db = await database;
+    try {
+      print("Обеспечение разделения данных пользователей...");
+      
+      // Проверяем, есть ли колонка user_id в таблицах
+      final transactionsColumns = await db.rawQuery('PRAGMA table_info(transactions)');
+      final walletsColumns = await db.rawQuery('PRAGMA table_info(wallets)');
+      
+      bool transactionsHasUserId = false;
+      bool walletsHasUserId = false;
+      
+      for (var col in transactionsColumns) {
+        if (col['name'] == 'user_id') {
+          transactionsHasUserId = true;
+          break;
+        }
+      }
+      
+      for (var col in walletsColumns) {
+        if (col['name'] == 'user_id') {
+          walletsHasUserId = true;
+          break;
+        }
+      }
+      
+      // Добавляем колонку user_id при необходимости
+      if (!transactionsHasUserId) {
+        await db.execute('ALTER TABLE transactions ADD COLUMN user_id INTEGER');
+        print('Добавлена колонка user_id в таблицу transactions');
+      }
+      
+      if (!walletsHasUserId) {
+        await db.execute('ALTER TABLE wallets ADD COLUMN user_id INTEGER');
+        print('Добавлена колонка user_id в таблицу wallets');
+      }
+      
+      // Определяем текущего пользователя
+      final currentUser = await getCurrentUserId();
+      
+      // Если есть транзакции или кошельки без user_id и пользователь залогинен,
+      // присваиваем их текущему пользователю
+      if (currentUser != null) {
+        final transactions = await db.query(
+          'transactions',
+          where: 'user_id IS NULL'
+        );
+        
+        if (transactions.isNotEmpty) {
+          print('Найдено ${transactions.length} транзакций без привязки к пользователю. Привязываем к ID $currentUser');
+          await db.execute(
+            'UPDATE transactions SET user_id = ? WHERE user_id IS NULL',
+            [currentUser]
+          );
+        }
+        
+        final wallets = await db.query(
+          'wallets',
+          where: 'user_id IS NULL'
+        );
+        
+        if (wallets.isNotEmpty) {
+          print('Найдено ${wallets.length} кошельков без привязки к пользователю. Привязываем к ID $currentUser');
+          await db.execute(
+            'UPDATE wallets SET user_id = ? WHERE user_id IS NULL',
+            [currentUser]
+          );
+        }
+      }
+      
+      print("Обеспечение разделения данных пользователей завершено");
+    } catch (e) {
+      print('Ошибка при обеспечении разделения данных пользователей: $e');
+    }
+  }
+  
+  // Логаут пользователя
+  Future<bool> logoutUser() async {
+    final db = await database;
+    try {
+      // Получаем текущий ID пользователя
+      final currentUserId = await getCurrentUserId();
+      
+      if (currentUserId != null) {
+        // Выходим только из текущего аккаунта
+        await db.update(
+          'user',
+          {'is_logged_in': 0},
+          where: 'id = ?',
+          whereArgs: [currentUserId]
+        );
+        
+        print('Пользователь с ID $currentUserId вышел из системы');
+      } else {
+        // Если никто не залогинен, выходим из всех (на всякий случай)
+        await db.update('user', {'is_logged_in': 0});
+        print('Выход из всех аккаунтов');
+      }
+      
+      return true;
+    } catch (e) {
+      print('Ошибка при логауте пользователя: $e');
+      return false;
+    }
+  }
+  
+  // Логин пользователя с полным разделением данных
+  Future<Map<String, dynamic>?> loginUser(String email, String password, bool rememberMe) async {
+    await _ensureUserDataSeparation();
+    final db = await database;
+    
+    try {
+      print('Попытка входа пользователя с email: $email');
+      
+      // Проверяем учетные данные
+      final List<Map<String, dynamic>> users = await db.query(
+        'user',
+        where: 'email = ? AND password = ?',
+        whereArgs: [email, password],
+      );
+      
+      if (users.isEmpty) {
+        print('Пользователь с email $email не найден или неверный пароль');
+        return null; // Неверные учетные данные
+      }
+      
+      // Сначала выходим из всех аккаунтов
+      await db.update('user', {'is_logged_in': 0});
+      
+      // Обновляем статус входа пользователя
+      final user = users.first;
+      final userId = user['id'] as int;
+      print('Пользователь найден: ID $userId, имя: ${user['name']}');
+      
+      await db.update(
+        'user',
+        {
+          'is_logged_in': 1,
+          'remember_me': rememberMe ? 1 : 0,
+        },
+        where: 'id = ?',
+        whereArgs: [userId],
+      );
+      
+      // Проверяем, есть ли у пользователя кошельки
+      final wallets = await db.query(
+        'wallets',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+      );
+      
+      print('Кошельки пользователя: ${wallets.length}');
+      
+      // Если у пользователя нет кошельков, создаем стартовый кошелек
+      if (wallets.isEmpty) {
+        print('Создаем начальный кошелек для пользователя $userId');
+        await db.insert('wallets', {
+          'name': 'Cash',
+          'balance': 0.0,
+          'type': 'Cash',
+          'user_id': userId
+        });
+      }
+      
+      // После логина еще раз убеждаемся, что все данные корректно разделены
+      await _ensureUserDataSeparation();
+      
+      return user;
+    } catch (e) {
+      print('Ошибка при входе пользователя: $e');
+      return null;
+    }
+  }
+  
+  // Регистрация пользователя с созданием уникального аккаунта
+  Future<int> registerUser(Map<String, dynamic> userData) async {
+    await _ensureUserDataSeparation();
+    final db = await database;
+    
+    try {
+      final email = userData['email'] as String;
+      print('Регистрация нового пользователя: $email');
+      
+      // Проверяем, существует ли пользователь
+      final List<Map<String, dynamic>> existingUsers = await db.query(
+        'user',
+        where: 'email = ?',
+        whereArgs: [email],
+      );
+      
+      if (existingUsers.isNotEmpty) {
+        print('Пользователь с email $email уже существует');
+        return -1; // Пользователь уже существует
+      }
+      
+      // Сначала выходим из всех аккаунтов
+      await db.update('user', {'is_logged_in': 0});
+      
+      // Устанавливаем статус входа для нового пользователя
+      userData['is_logged_in'] = 1;
+      
+      // Вставляем нового пользователя
+      final userId = await db.insert('user', userData);
+      print('Создан новый пользователь с ID: $userId');
+      
+      if (userId > 0) {
+        // Создаем начальный кошелек для нового пользователя
+        final wallet = {
+          'name': 'Cash',
+          'balance': 0.0,
+          'type': 'Cash',
+          'user_id': userId
+        };
+        
+        final walletId = await db.insert('wallets', wallet);
+        print('Создан начальный кошелек с ID $walletId для пользователя $userId');
+        
+        // Подтверждаем, что кошелек создан для правильного пользователя
+        final wallets = await db.query(
+          'wallets',
+          where: 'user_id = ?',
+          whereArgs: [userId]
+        );
+        
+        print('Кошельки для пользователя $userId: ${wallets.length}');
+      }
+      
+      return userId;
+    } catch (e) {
+      print('Ошибка при регистрации пользователя: $e');
+      return -2; // Ошибка регистрации
+    }
+  }
+
+  // Get current logged-in user's ID
+  Future<int?> getCurrentUserId() async {
+    final db = await database;
+    
+    final List<Map<String, dynamic>> users = await db.query(
+      'user',
+      columns: ['id', 'name', 'email'],
+      where: 'is_logged_in = ?',
+      whereArgs: [1],
+      limit: 1,
+    );
+    
+    if (users.isEmpty) {
+      print("Текущий пользователь не найден, работаем в гостевом режиме");
+      return null;
+    }
+    
+    final user = users.first;
+    final userId = user['id'] as int;
+    print("Текущий пользователь: ID: $userId, Имя: ${user['name']}, Email: ${user['email']}");
+    
+    return userId;
+  }
+  
+  // Get transactions for the current user or guest mode
+  Future<List<Map<String, dynamic>>> getTransactions() async {
+    final db = await database;
+    final int? userId = await getCurrentUserId();
+    
+    try {
+      if (userId != null) {
+        // Get transactions for logged-in user
+        print("Получаем транзакции для пользователя с ID: $userId");
+        final transactions = await db.query(
+          'transactions',
+          where: 'user_id = ?',
+          whereArgs: [userId],
+          orderBy: 'date DESC'
+        );
+        print("Найдено ${transactions.length} транзакций для пользователя $userId");
+        return transactions;
+      } else {
+        // Guest mode - get transactions with no user_id
+        print("Режим гостя: получаем транзакции без user_id");
+        final transactions = await db.query(
+          'transactions',
+          where: 'user_id IS NULL',
+          orderBy: 'date DESC'
+        );
+        print("Найдено ${transactions.length} транзакций в гостевом режиме");
+        return transactions;
+      }
+    } catch (e) {
+      print("Ошибка при получении транзакций: $e");
+      return [];
+    }
+  }
+
+  // Создаем таблицу wallets, если она не существует
+  Future<void> _ensureWalletsTableExists() async {
+    try {
+      final db = await database;
+      final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='wallets'");
+      
+      if (tables.isEmpty) {
+        print("Таблица wallets не существует, создаем ее...");
+        await db.execute('''
+          CREATE TABLE wallets(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            balance REAL DEFAULT 0.0,
+            type TEXT,
+            user_id INTEGER
+          )
+        ''');
+        print("Таблица wallets успешно создана");
+      } else {
+        print("Таблица wallets уже существует");
+      }
+    } catch (e) {
+      print("Ошибка при проверке/создании таблицы wallets: $e");
     }
   }
 }

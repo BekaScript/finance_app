@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/pages/HomeScreen.dart';
 import 'package:personal_finance/pages/TransactionHistoryScreen.dart';
 import 'package:personal_finance/pages/ReportsScreen.dart';
 import 'package:personal_finance/pages/SettingsScreen.dart';
 import 'package:personal_finance/pages/LogingRegister.dart';
-import 'package:personal_finance/pages/CategoryScreen.dart';
 import 'package:personal_finance/services/language_service.dart';
 import 'package:personal_finance/services/theme_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -51,7 +49,7 @@ class MyApp extends StatelessWidget {
           darkTheme: _buildDarkTheme(),
           themeMode: themeMode,
           debugShowCheckedModeBanner: false,
-          home: const AuthCheckScreen(),
+          home: const MainNavigationScreen(),
           routes: {
             '/login': (context) => const Loginregister(),
             '/home': (context) => const MainNavigationScreen(),
