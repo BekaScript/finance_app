@@ -4,6 +4,7 @@ import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/utils/currency_utils.dart';
 import 'package:personal_finance/services/language_service.dart';
 import 'package:intl/intl.dart';
+import 'dart:math' show max;
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -62,9 +63,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       // First load total income and expenses for the period
       final incomeTotal = await db.rawQuery('''
-        SELECT COALESCE(SUM(amount), 0) as total,
-               date,
-               COALESCE(SUM(amount), 0) as daily_total
+        SELECT date, COALESCE(SUM(amount), 0) as daily_total
         FROM transactions 
         WHERE type = 'income' 
         AND date BETWEEN ? AND ?
@@ -75,9 +74,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ]);
 
       final expenseTotal = await db.rawQuery('''
-        SELECT COALESCE(SUM(amount), 0) as total,
-               date,
-               COALESCE(SUM(amount), 0) as daily_total
+        SELECT date, COALESCE(SUM(amount), 0) as daily_total
         FROM transactions 
         WHERE type = 'expense' 
         AND date BETWEEN ? AND ?
@@ -342,7 +339,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                       // Chart Section
                       Container(
-                        height: 280,
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.of(context).size.height * 0.35,
+                          minHeight: 200,
+                        ),
                         margin: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.surface,
@@ -654,123 +654,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         );
       }
       
-      // Calculate max Y value safely
-      double maxY = 100.0; // Default value if no data
-      if (dailyIncome.isNotEmpty || dailyExpense.isNotEmpty) {
-        final allValues = [...dailyIncome.values, ...dailyExpense.values];
-        if (allValues.isNotEmpty) {
-          maxY = allValues.reduce((max, value) => value > max ? value : max) * 1.2;
-        }
-      }
-      
-      return BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceBetween,
-          maxY: maxY,
-          titlesData: FlTitlesData(
-            show: true,
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final allDates = {...dailyIncome.keys, ...dailyExpense.keys}
-                      .toList()
-                    ..sort();
-                  if (value.toInt() >= 0 && value.toInt() < allDates.length) {
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        DateFormat('MMM d')
-                            .format(DateTime.parse(allDates[value.toInt()])),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withOpacity(0.6),
-                        ),
-                      ),
-                    );
-                  }
-                  return const SizedBox();
-                },
-                reservedSize: 30,
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  return Text(
-                    '$_currencySymbol${value.toInt()}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.6),
-                    ),
-                  );
-                },
-                reservedSize: 40,
-              ),
-            ),
-            rightTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-          ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (value) {
-              return FlLine(
-                color: Theme.of(context).dividerColor,
-                strokeWidth: 0.5,
-              );
-            },
-          ),
-          borderData: FlBorderData(show: false),
-          barGroups: _createBarGroups(dailyIncome, dailyExpense),
-          barTouchData: BarTouchData(
-            enabled: true,
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (barGroup) =>
-                  Theme.of(context).colorScheme.surface,
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final date = {...dailyIncome.keys, ...dailyExpense.keys}
-                    .toList()[group.x.toInt()];
-                return BarTooltipItem(
-                  '${DateFormat('MMM d, y').format(DateTime.parse(date))}\n',
-                  TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  children: [
-                    TextSpan(
-                      text:
-                          'Income: $_currencySymbol${dailyIncome[date]?.toStringAsFixed(0) ?? '0'}',
-                      style: TextStyle(
-                        color: Colors.green,
-                      ),
-                    ),
-                    const TextSpan(text: '\n'),
-                    TextSpan(
-                      text:
-                          'Expense: $_currencySymbol${dailyExpense[date]?.toStringAsFixed(0) ?? '0'}',
-                      style: TextStyle(
-                        color: Colors.red,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      );
+      return _buildBarChart(dailyIncome, dailyExpense);
     }
   }
 
@@ -984,6 +868,162 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return Icons.shopping_bag;
   }
 
+  Widget _buildBarChart(Map<String, double> dailyIncome, Map<String, double> dailyExpense) {
+    final allDates = {...dailyIncome.keys, ...dailyExpense.keys}.toList()..sort();
+    
+    if (allDates.isEmpty) {
+      return Center(
+        child: Text(
+          _languageService.translate('noDataForSelectedPeriod') ?? 'No data for selected period',
+          style: TextStyle(fontSize: 16),
+        ),
+      );
+    }
+    
+    // Create consolidated daily totals
+    final barGroups = _createBarGroups(dailyIncome, dailyExpense);
+    
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: EdgeInsets.all(8),
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: selectedType == 'income'
+                      ? dailyIncome.values.isEmpty
+                          ? 100
+                          : dailyIncome.values.reduce((a, b) => a > b ? a : b) * 1.2
+                      : dailyExpense.values.isEmpty
+                          ? 100
+                          : dailyExpense.values.reduce((a, b) => a > b ? a : b) * 1.2,
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => Colors.white,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        String formattedAmount = '$_currencySymbol${rod.toY.toStringAsFixed(0)}';
+                        String date = allDates[group.x.toInt()];
+                        // Format date to be more readable
+                        String formattedDate = DateFormat('MMM d').format(DateTime.parse(date));
+                        return BarTooltipItem(
+                          '$formattedDate\n$formattedAmount',
+                          TextStyle(
+                            color: selectedType == 'income' ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 30,
+                        getTitlesWidget: (value, meta) {
+                          // Only show dates at fixed intervals to prevent overlap
+                          if (value.toInt() >= 0 && value.toInt() < allDates.length) {
+                            // Calculate interval based on number of bars to prevent overlap
+                            int interval = (allDates.length / 5).ceil();
+                            if (value.toInt() % interval == 0 || value.toInt() == allDates.length - 1) {
+                              final date = allDates[value.toInt()];
+                              // Format date to be more readable
+                              String formattedDate = DateFormat('d').format(DateTime.parse(date));
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(
+                                  formattedDate,
+                                  style: TextStyle(fontSize: 10),
+                                ),
+                              );
+                            }
+                          }
+                          return SizedBox();
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) {
+                          if (value == 0) return SizedBox();
+                          // Show fewer labels on Y-axis
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Text(
+                              '$_currencySymbol${value.toInt()}',
+                              style: TextStyle(fontSize: 10),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    horizontalInterval: 1,
+                    getDrawingHorizontalLine: (value) {
+                      return FlLine(
+                        color: Colors.grey.withOpacity(0.1),
+                        strokeWidth: 1,
+                      );
+                    },
+                    getDrawingVerticalLine: (value) {
+                      return FlLine(
+                        color: Colors.transparent,
+                        strokeWidth: 0,
+                      );
+                    },
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: barGroups,
+                  backgroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          // Small legend to show what the bars represent
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: selectedType == 'income' ? Colors.green.withOpacity(0.7) : Colors.red.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                SizedBox(width: 4),
+                Text(
+                  selectedType == 'income' ? 'Daily Income' : 'Daily Expense',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<BarChartGroupData> _createBarGroups(
       Map<String, double> dailyIncome, Map<String, double> dailyExpense) {
     final allDates = {...dailyIncome.keys, ...dailyExpense.keys}.toList()
@@ -991,24 +1031,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     return List.generate(allDates.length, (index) {
       final date = allDates[index];
-      final income = dailyIncome[date] ?? 0;
-      final expense = dailyExpense[date] ?? 0;
+      // Only use the appropriate data based on selectedType
+      double value = 0;
+      Color barColor;
+      
+      if (selectedType == 'income') {
+        value = dailyIncome[date] ?? 0;
+        barColor = Colors.green.withOpacity(0.7);
+      } else {
+        value = dailyExpense[date] ?? 0;
+        barColor = Colors.red.withOpacity(0.7);
+      }
 
       return BarChartGroupData(
         x: index,
-        groupVertically: true,
         barRods: [
           BarChartRodData(
-            toY: income,
-            color: Colors.green.withOpacity(0.7),
-            width: 8,
-            borderRadius: BorderRadius.zero,
-          ),
-          BarChartRodData(
-            toY: expense,
-            color: Colors.red.withOpacity(0.7),
-            width: 8,
-            borderRadius: BorderRadius.zero,
+            toY: value,
+            color: barColor,
+            width: allDates.length > 15 ? 8 : 16, // Adjust width based on number of bars
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(4),
+              topRight: Radius.circular(4),
+            ),
           ),
         ],
       );

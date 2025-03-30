@@ -96,4 +96,11 @@ Map<String, String> get en => {
   'notImplemented': 'Not implemented yet',
   'thisYear': 'This Year',
   'lastYear': 'Last Year',
+  'notFormatted': 'Not formatted',
+  'appLockDescription': 'App lock protects your financial data with authentication',
+  'lockNow': 'Lock Now',
+  'lockNowDescription': 'Lock the app immediately',
+  'unlockSuccessful': 'App unlocked successfully',
+  'incomeByDay': 'Income by day',
+  'expenseByDay': 'Expense by day',
 }; 

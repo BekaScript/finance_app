@@ -98,4 +98,11 @@ Map<String, String> get ky => {
   'notImplemented': 'Бул функция азырынча жеткиликтүү эмес',
   'thisYear': 'Бул жыл',
   'lastYear': 'Өткөн жыл',
+  'notFormatted': 'Форматталбаган',
+  'appLockDescription': 'Тиркеме кулпусу сиздин финансылык маалыматыңызды аутентификация аркылуу коргойт',
+  'lockNow': 'Азыр кулптоо',
+  'lockNowDescription': 'Тиркемени дароо кулптоо',
+  'unlockSuccessful': 'Тиркеме ийгиликтүү ачылды',
+  'incomeByDay': 'Күндөр боюнча киреше',
+  'expenseByDay': 'Күндөр боюнча чыгашалар',
 }; 

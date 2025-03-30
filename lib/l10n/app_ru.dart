@@ -98,4 +98,11 @@ Map<String, String> get ru => {
   'notImplemented': 'Еще не реализовано',
   'thisYear': 'Этот год',
   'lastYear': 'Прошлый год',
+  'notFormatted': 'Не отформатировано',
+  'appLockDescription': 'Блокировка приложения защищает ваши финансовые данные с помощью аутентификации',
+  'lockNow': 'Заблокировать сейчас',
+  'lockNowDescription': 'Заблокировать приложение немедленно',
+  'unlockSuccessful': 'Приложение успешно разблокировано',
+  'incomeByDay': 'Доход по дням',
+  'expenseByDay': 'Расходы по дням',
 }; 
