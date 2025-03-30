@@ -233,33 +233,60 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Type Dropdown
-              DropdownButtonFormField<String>(
-                value: _type,
-                decoration: InputDecoration(
-                  labelText: _languageService.translate('type'),
-                  prefixIcon:
-                      const Icon(Icons.type_specimen, color: Colors.blueAccent),
-                  border: OutlineInputBorder(
+              // Type Dropdown (replaced with Segmented Button)
+              Center(
+                child: Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: SegmentedButton<String>(
+                      style: ButtonStyle(
+                        backgroundColor: MaterialStateProperty.resolveWith<Color>(
+                          (Set<MaterialState> states) {
+                            if (states.contains(MaterialState.selected)) {
+                              return _type == 'income' ? Colors.green.shade100 : Colors.red.shade100;
+                            }
+                            return Colors.transparent;
+                          },
+                        ),
+                        foregroundColor: MaterialStateProperty.resolveWith<Color>(
+                          (Set<MaterialState> states) {
+                            if (states.contains(MaterialState.selected)) {
+                              return _type == 'income' ? Colors.green.shade800 : Colors.red.shade800;
+                            }
+                            return Colors.grey.shade700;
+                          },
+                        ),
+                      ),
+                      segments: [
+                        ButtonSegment<String>(
+                          value: 'income',
+                          label: Text(_languageService.translate('income')),
+                          icon: const Icon(Icons.arrow_downward),
+                        ),
+                        ButtonSegment<String>(
+                          value: 'expense',
+                          label: Text(_languageService.translate('expense')),
+                          icon: const Icon(Icons.arrow_upward),
+                        ),
+                      ],
+                      selected: {_type},
+                      onSelectionChanged: (Set<String> newSelection) {
+                        if (newSelection.isNotEmpty) {
+                          setState(() {
+                            _type = newSelection.first;
+                            _updateCurrentCategories();
+                            // Reset category when changing type
+                            _category = _currentCategories.isNotEmpty ? _currentCategories.first['name'] : null;
+                          });
+                        }
+                      },
+                    ),
+                  ),
                 ),
-                items: ["income", "expense"].map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(_languageService.translate(type)),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _type = value;
-                      _updateCurrentCategories();
-                      // Reset category when changing type
-                      _category = _currentCategories.isNotEmpty ? _currentCategories.first['name'] : null;
-                    });
-                  }
-                },
               ),
               const SizedBox(height: 20),
 

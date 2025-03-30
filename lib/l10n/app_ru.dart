@@ -52,6 +52,14 @@ Map<String, String> ruTranslations = {
   'INR': 'Индийская рупия',
   'KGS': 'Кыргызский сом',
   'languageUpdated': 'Язык обновлен',
+  'resetData': 'Сбросить данные',
+  'resetDataDescription': 'Это очистит все транзакции и обнулит балансы кошельков',
+  'resetDataConfirmation': 'Подтверждение сброса данных',
+  'areYouSureResetData': 'Вы уверены, что хотите сбросить все данные о транзакциях? Это действие нельзя отменить.',
+  'reset': 'Сбросить',
+  'resetDataSuccess': 'Данные успешно сброшены',
+  'resetDataError': 'Ошибка при сбросе данных. Пожалуйста, попробуйте еще раз.',
+  'resettingData': 'Сброс данных...',
   
   // Categories
   'Food': 'Еда',
@@ -103,4 +111,11 @@ Map<String, String> ruTranslations = {
   'confirmDeleteTransaction': 'Вы уверены, что хотите удалить эту транзакцию?',
   'transactionActions': 'Действия с транзакцией',
   'whatWouldYouLikeToDo': 'Что вы хотите сделать?',
+  
+  // Add Russian translations for the new keys
+  'rememberMe': 'Запомнить меня',
+  'logoutConfirmation': 'Подтверждение выхода',
+  'areYouSureLogout': 'Вы уверены, что хотите выйти?',
+  'logoutError': 'При выходе произошла ошибка. Пожалуйста, попробуйте еще раз.',
+  'loading': 'Загрузка...',
 }; 

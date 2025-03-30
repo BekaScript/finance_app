@@ -18,14 +18,17 @@ class _LoginregisterState extends State<Loginregister> {
   final TextEditingController _nameController = TextEditingController();
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final LanguageService _languageService = LanguageService();
+  bool _rememberMe = false;
 
   // Function to handle login
   Future<bool> _login(String email, String password) async {
     try {
       final db = await _dbHelper.database;
       
-      // First, reset all users' logged_in status
-      await db.update('user', {'is_logged_in': 0});
+      // First, reset all users' logged_in status if not using remember me
+      if (!_rememberMe) {
+        await db.update('user', {'is_logged_in': 0});
+      }
       
       // Check user credentials
       final List<Map<String, dynamic>> users = await db.query(
@@ -38,7 +41,7 @@ class _LoginregisterState extends State<Loginregister> {
         // Set this user as logged in
         await db.update(
           'user',
-          {'is_logged_in': 1},
+          {'is_logged_in': 1, 'remember_me': _rememberMe ? 1 : 0},
           where: 'email = ?',
           whereArgs: [email]
         );
@@ -193,6 +196,29 @@ class _LoginregisterState extends State<Loginregister> {
                           },
                         ),
                         const SizedBox(height: 16),
+                        
+                        // Remember Me Checkbox (only shown on login screen)
+                        if (_isLogin)
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: _rememberMe,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _rememberMe = value ?? false;
+                                  });
+                                },
+                                activeColor: Colors.deepPurple,
+                              ),
+                              Text(
+                                _languageService.translate('rememberMe'),
+                                style: TextStyle(
+                                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                                ),
+                              ),
+                            ],
+                          ),
+                          
                         // Login/Register Button
                         SizedBox(
                           width: double.infinity,

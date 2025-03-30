@@ -53,6 +53,14 @@ Map<String, String> kyTranslations = {
   'INR': 'Индия руписи',
   'KGS': 'Кыргыз сому',
   'languageUpdated': 'Тил жаңыланды',
+  'resetData': 'Маалыматтарды тазалоо',
+  'resetDataDescription': 'Бул бардык транзакцияларды тазалайт жана капчыктардын балансын нөлгө коёт',
+  'resetDataConfirmation': 'Маалыматтарды тазалоону ырастоо',
+  'areYouSureResetData': 'Сиз чындап эле бардык транзакция маалыматтарын тазалагыңыз келеби? Бул кайтарылбайт.',
+  'reset': 'Тазалоо',
+  'resetDataSuccess': 'Маалыматтар ийгиликтүү тазаланды',
+  'resetDataError': 'Маалыматтарды тазалоодо ката кетти. Кайталап көрүңүз.',
+  'resettingData': 'Маалыматтар тазаланууда...',
   
   // Categories
   'Food': 'Тамак-аш',
@@ -104,4 +112,11 @@ Map<String, String> kyTranslations = {
   'confirmDeleteTransaction': 'Бул транзакцияны өчүрүүнү каалайсызбы?',
   'transactionActions': 'Транзакция иш-аракеттери',
   'whatWouldYouLikeToDo': 'Эмне кылгыңыз келет?',
+  
+  // Add Kyrgyz translations for the new keys
+  'rememberMe': 'Мени эстеп кал',
+  'logoutConfirmation': 'Чыгуу ырастоосу',
+  'areYouSureLogout': 'Сиз чыгууну каалайсызбы?',
+  'logoutError': 'Чыгууда ката кетти. Кайталап көрүңүз.',
+  'loading': 'Жүктөлүүдө...',
 }; 

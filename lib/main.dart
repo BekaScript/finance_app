@@ -50,7 +50,11 @@ class MyApp extends StatelessWidget {
           darkTheme: _buildDarkTheme(),
           themeMode: themeMode,
           debugShowCheckedModeBanner: false,
-          home: const Loginregister(),
+          home: const AuthCheckScreen(),
+          routes: {
+            '/login': (context) => const Loginregister(),
+            '/home': (context) => const MainNavigationScreen(),
+          },
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
@@ -350,6 +354,82 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Screen to check if user is logged in
+class AuthCheckScreen extends StatefulWidget {
+  const AuthCheckScreen({super.key});
+
+  @override
+  State<AuthCheckScreen> createState() => _AuthCheckScreenState();
+}
+
+class _AuthCheckScreenState extends State<AuthCheckScreen> {
+  final DatabaseHelper _dbHelper = DatabaseHelper();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoggedInUser();
+  }
+
+  Future<void> _checkLoggedInUser() async {
+    try {
+      final db = await _dbHelper.database;
+      final List<Map<String, dynamic>> users = await db.query(
+        'user',
+        where: 'is_logged_in = ? OR remember_me = ?',
+        whereArgs: [1, 1],
+        limit: 1,
+      );
+
+      // Delayed navigation to ensure the widget is mounted
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (mounted) {
+        if (users.isNotEmpty) {
+          // User is logged in or has remember me set
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+          );
+        } else {
+          // No logged in user
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const Loginregister()),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error checking logged in user: $e');
+      // On error, default to login screen
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const Loginregister()),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(
+              color: Colors.deepPurple,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              LanguageService().translate('loading'),
+              style: const TextStyle(fontSize: 16),
+            ),
+          ],
         ),
       ),
     );

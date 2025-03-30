@@ -3,6 +3,7 @@ Map<String, String> enTranslations = {
   // General
   'personalFinance': 'Personal Finance',
   'settings': 'Settings',
+  'loading': 'Loading...',
   
   // Login/Register
   'welcomeBack': 'Welcome Back!',
@@ -20,6 +21,7 @@ Map<String, String> enTranslations = {
   'emailExists': 'Email already exists or registration failed',
   'dontHaveAccount': "Don't have an account? Register",
   'alreadyHaveAccount': 'Already have an account? Login',
+  'rememberMe': 'Remember me',
   
   // Navigation
   'home': 'Home',
@@ -36,6 +38,9 @@ Map<String, String> enTranslations = {
   'category': 'Category',
   'logout': 'Logout',
   'logoutConfirm': 'Are you sure you want to logout?',
+  'logoutConfirmation': 'Logout Confirmation',
+  'areYouSureLogout': 'Are you sure you want to log out?',
+  'logoutError': 'There was an error logging out. Please try again.',
   
   // Settings
   'darkMode': 'Dark Mode',
@@ -52,6 +57,14 @@ Map<String, String> enTranslations = {
   'INR': 'Indian Rupee',
   'KGS': 'Kyrgyzstani Som',
   'languageUpdated': 'Language Updated',
+  'resetData': 'Reset Data',
+  'resetDataDescription': 'This will clear all transactions and reset wallet balances',
+  'resetDataConfirmation': 'Reset Data Confirmation',
+  'areYouSureResetData': 'Are you sure you want to reset all transaction data? This cannot be undone.',
+  'reset': 'Reset',
+  'resetDataSuccess': 'Data reset successful',
+  'resetDataError': 'Error resetting data. Please try again.',
+  'resettingData': 'Resetting data...',
   
   // Categories
   'Food': 'Food',
