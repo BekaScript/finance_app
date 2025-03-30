@@ -12,6 +12,44 @@ class LanguageService {
   String _currentLanguage = 'en';
   final DatabaseHelper _dbHelper = DatabaseHelper();
   
+  static final Map<String, Map<String, String>> _translations = {
+    'en': {
+      // ... existing translations ...
+      'wallets': 'Wallets',
+      'dragToTransfer': 'Drag to transfer between wallets',
+      'transferFunds': 'Transfer Funds',
+      'from': 'From',
+      'to': 'To',
+      'amount': 'Amount',
+      'transfer': 'Transfer',
+      'enterAmount': 'Please enter an amount',
+      'enterValidAmount': 'Please enter a valid amount greater than zero',
+      'insufficientFunds': 'Insufficient funds in source wallet',
+      'transferSuccess': 'Transfer completed successfully',
+      'transferFailed': 'Transfer failed',
+      'noWallets': 'No wallets found',
+      // ... existing translations ...
+    },
+    'es': {
+      // ... existing translations ...
+      'wallets': 'Carteras',
+      'dragToTransfer': 'Arrastra para transferir entre carteras',
+      'transferFunds': 'Transferir Fondos',
+      'from': 'De',
+      'to': 'A',
+      'amount': 'Cantidad',
+      'transfer': 'Transferir',
+      'enterAmount': 'Por favor, introduce una cantidad',
+      'enterValidAmount': 'Por favor, introduce una cantidad válida mayor que cero',
+      'insufficientFunds': 'Fondos insuficientes en la cartera de origen',
+      'transferSuccess': 'Transferencia completada con éxito',
+      'transferFailed': 'La transferencia falló',
+      'noWallets': 'No se encontraron carteras',
+      // ... existing translations ...
+    },
+    // ... other languages ...
+  };
+  
   Map<String, Map<String, String>> translations = {
     'en': enTranslations,
     'ru': ruTranslations,

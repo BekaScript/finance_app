@@ -5,6 +5,7 @@ import 'package:personal_finance/pages/LogingRegister.dart';
 import 'package:personal_finance/widgets/summary_card.dart';
 import '../utils/currency_utils.dart';
 import '../services/language_service.dart';
+import '../pages/CategoryScreen.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late DatabaseHelper dbHelper;
   late Future<List<Map<String, dynamic>>> _transactionsFuture;
+  late Future<List<Map<String, dynamic>>> _walletsFuture;
 
   double _totalIncome = 0.0;
   double _totalExpenses = 0.0;
@@ -28,12 +30,21 @@ class _HomeScreenState extends State<HomeScreen> {
   String _currencySymbol = '\$';
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final LanguageService _languageService = LanguageService();
+  
+  // For wallet transfers
+  final TextEditingController _transferAmountController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     dbHelper = DatabaseHelper();
     _loadInitialData();
+  }
+  
+  @override
+  void dispose() {
+    _transferAmountController.dispose();
+    super.dispose();
   }
 
   @override
@@ -53,7 +64,18 @@ class _HomeScreenState extends State<HomeScreen> {
   // Load transactions and summary data
   void _loadData() {
     _transactionsFuture = _fetchTransactions();
+    _walletsFuture = _fetchWallets();
     _fetchSummaryData();
+  }
+  
+  // Fetch all wallets
+  Future<List<Map<String, dynamic>>> _fetchWallets() async {
+    try {
+      return await _dbHelper.getAllWallets();
+    } catch (e) {
+      print("Error fetching wallets: $e");
+      return [];
+    }
   }
 
   // Fetch summary data (income, expenses, balance)
@@ -167,6 +189,106 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
+  
+  // Show transfer dialog when dropping a wallet onto another
+  void _showTransferDialog(Map<String, dynamic> sourceWallet, Map<String, dynamic> targetWallet) {
+    _transferAmountController.clear();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_languageService.translate('transferFunds')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "${_languageService.translate('from')}: ${sourceWallet['name']} ($_currencySymbol${sourceWallet['balance'].toStringAsFixed(2)})",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "${_languageService.translate('to')}: ${targetWallet['name']} ($_currencySymbol${targetWallet['balance'].toStringAsFixed(2)})",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _transferAmountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: _languageService.translate('amount'),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                prefixText: _currencySymbol,
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_languageService.translate('cancel')),
+          ),
+          TextButton(
+            onPressed: () async {
+              // Validate input
+              final amountText = _transferAmountController.text;
+              if (amountText.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(_languageService.translate('enterAmount')))
+                );
+                return;
+              }
+              
+              double? amount = double.tryParse(amountText);
+              if (amount == null || amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(_languageService.translate('enterValidAmount')))
+                );
+                return;
+              }
+              
+              if (amount > sourceWallet['balance']) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(_languageService.translate('insufficientFunds')))
+                );
+                return;
+              }
+              
+              // Process transfer
+              bool success = await _dbHelper.transferBetweenWallets(
+                sourceWallet['id'],
+                targetWallet['id'],
+                amount
+              );
+              
+              if (mounted) {
+                Navigator.pop(context);
+                
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_languageService.translate('transferSuccess')))
+                  );
+                  
+                  // Refresh data
+                  setState(() {
+                    _loadData();
+                  });
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_languageService.translate('transferFailed')))
+                  );
+                }
+              }
+            },
+            child: Text(_languageService.translate('transfer')),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -228,6 +350,62 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
+            
+            // Wallet Cards with Drag & Drop
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _languageService.translate('wallets'),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        _languageService.translate('dragToTransfer'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _walletsFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return Center(
+                          child: Text(_languageService.translate('noWallets'))
+                        );
+                      }
+                      
+                      final wallets = snapshot.data!;
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: wallets.map((wallet) {
+                          final balance = wallet['balance'] as double;
+                          
+                          return _buildDraggableWalletCard(wallet, wallets);
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
 
             // Recent Transactions
             Expanded(
@@ -251,12 +429,29 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
 
                     final transactions = snapshot.data!;
-                    return ListView.builder(
-                      itemCount: transactions.length,
-                      itemBuilder: (context, index) {
-                        final transaction = transactions[index];
-                        return _buildTransactionTile(transaction);
-                      },
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          child: Text(
+                            _languageService.translate('recentTransactions'),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: transactions.length,
+                            itemBuilder: (context, index) {
+                              final transaction = transactions[index];
+                              return _buildTransactionTile(transaction);
+                            },
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -271,7 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () async {
           final result = await Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => AddTransactionScreen()),
+            MaterialPageRoute(builder: (context) => const AddTransactionScreen()),
           );
 
           if (result == true) {
@@ -285,11 +480,155 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+  
+  // Build a draggable wallet card
+  Widget _buildDraggableWalletCard(Map<String, dynamic> wallet, List<Map<String, dynamic>> allWallets) {
+    final balance = wallet['balance'] as double;
+    
+    return LongPressDraggable<Map<String, dynamic>>(
+      data: wallet,
+      feedback: Material(
+        elevation: 4.0,
+        borderRadius: BorderRadius.circular(12.0),
+        child: Container(
+          width: 150,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                wallet['name'] as String,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$_currencySymbol${balance.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: balance >= 0 ? Colors.green : Colors.red,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.5,
+        child: _buildWalletCard(wallet),
+      ),
+      child: DragTarget<Map<String, dynamic>>(
+        onWillAccept: (data) => data != null && data['id'] != wallet['id'],
+        onAccept: (sourceWallet) {
+          // Show transfer dialog when a wallet is dropped onto this one
+          _showTransferDialog(sourceWallet, wallet);
+        },
+        builder: (context, candidateData, rejectedData) {
+          return _buildWalletCard(wallet, 
+            isTargeted: candidateData.isNotEmpty
+          );
+        },
+      ),
+    );
+  }
+  
+  // Build a wallet card
+  Widget _buildWalletCard(Map<String, dynamic> wallet, {bool isTargeted = false}) {
+    final balance = wallet['balance'] as double;
+    
+    return Card(
+      elevation: isTargeted ? 8 : 2,
+      margin: const EdgeInsets.only(right: 4, bottom: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isTargeted ? BorderSide(
+          color: Colors.deepPurple,
+          width: 2,
+        ) : BorderSide.none,
+      ),
+      child: Container(
+        width: 150,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              wallet['name'] as String,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$_currencySymbol${balance.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: balance >= 0 ? Colors.green : Colors.red,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // Widget to display each transaction
   Widget _buildTransactionTile(Map<String, dynamic> transaction) {
     bool isIncome = transaction['type'] == 'income';
+    bool isTransfer = transaction['type'] == 'transfer';
     final theme = Theme.of(context);
+    
+    // Get wallet name asynchronously
+    Widget buildWalletInfo() {
+      if (transaction['wallet_id'] == null) {
+        return const SizedBox.shrink();
+      }
+      
+      return FutureBuilder<List<Map<String, dynamic>>>(
+        future: _dbHelper.getAllWallets(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const SizedBox.shrink();
+          }
+          
+          final wallets = snapshot.data!;
+          final walletId = transaction['wallet_id'] as int;
+          
+          // Find matching wallet
+          final wallet = wallets.firstWhere(
+            (w) => w['id'] == walletId,
+            orElse: () => {'name': 'Unknown'},
+          );
+          
+          return Text(
+            wallet['name'] as String,
+            style: TextStyle(
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+            ),
+          );
+        },
+      );
+    }
+    
+    String description = transaction['description'] ?? '';
+    if (description.isEmpty) {
+      description = _languageService.translate('noDescription');
+    }
 
     return Card(
       elevation: 2,
@@ -298,21 +637,36 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListTile(
         leading: CircleAvatar(
           radius: 24,
-          backgroundColor: isIncome ? Colors.green[100] : Colors.red[100],
+          backgroundColor: isTransfer 
+              ? Colors.blue[100] 
+              : (isIncome ? Colors.green[100] : Colors.red[100]),
           child: Icon(
-            isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-            color: isIncome ? Colors.green : Colors.red,
+            isTransfer 
+                ? Icons.swap_horiz 
+                : (isIncome ? Icons.arrow_downward : Icons.arrow_upward),
+            color: isTransfer 
+                ? Colors.blue 
+                : (isIncome ? Colors.green : Colors.red),
           ),
         ),
-        title: Text(
-          _languageService.translate(transaction['category'] ?? 'Others'),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: theme.textTheme.bodyLarge?.color,
-          ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                isTransfer
+                    ? _languageService.translate('transfer')
+                    : _languageService.translate(transaction['category'] ?? 'Others'),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: theme.textTheme.bodyLarge?.color,
+                ),
+              ),
+            ),
+            buildWalletInfo(),
+          ],
         ),
         subtitle: Text(
-          '${_languageService.translate(transaction['description'])} - ${transaction['date']}',
+          '$description - ${transaction['date']}'.trim(),
           style: TextStyle(
             color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
             fontSize: 12,
@@ -321,7 +675,9 @@ class _HomeScreenState extends State<HomeScreen> {
         trailing: Text(
           '$_currencySymbol${transaction['amount'].toStringAsFixed(2)}',
           style: TextStyle(
-            color: transaction['type'] == 'expense' ? Colors.red : Colors.green,
+            color: isTransfer 
+                ? Colors.blue 
+                : (transaction['type'] == 'expense' ? Colors.red : Colors.green),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -402,9 +758,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirmDelete) {
       try {
-        final db = await dbHelper.database;
-        await db.delete('transactions',
-            where: 'id = ?', whereArgs: [transactionId]);
+        await _dbHelper.deleteTransaction(transactionId);
         setState(() {
           _loadData(); // Refresh transactions and summary data
         });
@@ -449,7 +803,13 @@ class _HomeScreenState extends State<HomeScreen> {
             leading: const Icon(Icons.category),
             title: Text(_languageService.translate('category')),
             onTap: () {
-              // Navigate to settings (implement later)
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CategoryScreen(),
+                ),
+              );
             },
           ),
           ListTile(

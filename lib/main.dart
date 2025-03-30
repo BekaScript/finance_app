@@ -18,6 +18,12 @@ void main() async {
   
   try {
     await dbHelper.database;
+    
+    // Initialize default data in specific order
+    await dbHelper.insertDefaultCategories(); // Add default categories if none exist
+    await dbHelper.insertDefaultWallets(); // Add default wallets if none exist
+    
+    // Initialize services
     await languageService.initLanguage();
     await themeService.initTheme();
   } catch (e) {

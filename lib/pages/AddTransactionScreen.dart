@@ -22,11 +22,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late TextEditingController _amountController;
   late TextEditingController _descriptionController;
   String _type = 'expense'; // Default to expense
-  String _category = 'Others';
+  String? _category;
+  int? _walletId;
   DateTime _selectedDate = DateTime.now();
-
-  // Predefined categories
-  final List<String> categories = ['Food', 'Transport', 'Shopping', 'Bills', 'Others'];
+  
+  // Lists to hold data from the database
+  List<Map<String, dynamic>> _incomeCategories = [];
+  List<Map<String, dynamic>> _expenseCategories = [];
+  List<Map<String, dynamic>> _currentCategories = []; // Categories for the current type
+  List<Map<String, dynamic>> _wallets = []; // Available wallets
 
   @override
   void initState() {
@@ -36,14 +40,57 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _amountController = TextEditingController();
     _descriptionController = TextEditingController();
 
+    // Load data from the database
+    _loadCategories();
+    _loadWallets();
+
     // If editing, prefill form fields
     if (widget.transaction != null) {
       _amountController.text = widget.transaction!['amount'].toString();
-      _descriptionController.text = widget.transaction!['description'];
+      _descriptionController.text = widget.transaction!['description'] ?? '';
       _type = widget.transaction!['type'];
       _category = widget.transaction!['category'];
+      _walletId = widget.transaction!['wallet_id'];
       _selectedDate = DateTime.parse(widget.transaction!['date']);
     }
+  }
+  
+  Future<void> _loadCategories() async {
+    // Load income categories
+    _incomeCategories = await _dbHelper.getCategories('income');
+    
+    // Load expense categories
+    _expenseCategories = await _dbHelper.getCategories('expense');
+    
+    // Set current categories based on the selected type
+    _updateCurrentCategories();
+    
+    // Set default category if needed
+    if (_category == null && _currentCategories.isNotEmpty) {
+      _category = _currentCategories.first['name'];
+    }
+    
+    if (mounted) {
+      setState(() {});
+    }
+  }
+  
+  Future<void> _loadWallets() async {
+    // Load wallets
+    _wallets = await _dbHelper.getAllWallets();
+    
+    // Set default wallet if needed
+    if (_walletId == null && _wallets.isNotEmpty) {
+      _walletId = _wallets.first['id'] as int;
+    }
+    
+    if (mounted) {
+      setState(() {});
+    }
+  }
+  
+  void _updateCurrentCategories() {
+    _currentCategories = _type == 'income' ? _incomeCategories : _expenseCategories;
   }
 
   @override
@@ -57,24 +104,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     if (_formKey.currentState!.validate()) {
       final transactionData = {
         'amount': double.parse(_amountController.text),
-        'description': _descriptionController.text,
+        'description': _descriptionController.text.trim(),
         'type': _type,
-        'category': _category,
+        'category': _category ?? (_currentCategories.isNotEmpty ? _currentCategories.first['name'] : 'Others'),
+        'wallet_id': _walletId,
         'date': _selectedDate.toIso8601String(),
       };
 
-      final db = await _dbHelper.database;
-
       if (widget.transaction == null) {
         // Insert new transaction
-        await db.insert('transactions', transactionData);
+        await _dbHelper.insertTransaction(transactionData);
       } else {
         // Update existing transaction
-        await db.update(
-          'transactions',
+        await _dbHelper.updateTransaction(
           transactionData,
-          where: 'id = ?',
-          whereArgs: [widget.transaction!['id']],
+          widget.transaction!['id'],
         );
       }
 
@@ -142,7 +186,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ),
           ),
         ),
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -156,7 +200,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 decoration: InputDecoration(
                   labelText: _languageService.translate('amount'),
                   prefixIcon:
-                      Icon(Icons.attach_money, color: Colors.blueAccent),
+                      const Icon(Icons.attach_money, color: Colors.blueAccent),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
@@ -175,19 +219,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Description Field
+              // Description Field (Optional)
               TextFormField(
                 controller: _descriptionController,
                 decoration: InputDecoration(
-                  labelText: _languageService.translate('description'),
-                  prefixIcon: Icon(Icons.description, color: Colors.blueAccent),
+                  labelText: _languageService.translate('description') + ' (' + _languageService.translate('optional') + ')',
+                  prefixIcon: const Icon(Icons.description, color: Colors.blueAccent),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
                 ),
-                validator: (value) => value == null || value.isEmpty
-                    ? _languageService.translate('enterDescription')
-                    : null,
+                // No validator since description is optional
               ),
               const SizedBox(height: 20),
 
@@ -197,7 +239,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 decoration: InputDecoration(
                   labelText: _languageService.translate('type'),
                   prefixIcon:
-                      Icon(Icons.type_specimen, color: Colors.blueAccent),
+                      const Icon(Icons.type_specimen, color: Colors.blueAccent),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
@@ -208,7 +250,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     child: Text(_languageService.translate(type)),
                   );
                 }).toList(),
-                onChanged: (value) => setState(() => _type = value!),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _type = value;
+                      _updateCurrentCategories();
+                      // Reset category when changing type
+                      _category = _currentCategories.isNotEmpty ? _currentCategories.first['name'] : null;
+                    });
+                  }
+                },
               ),
               const SizedBox(height: 20),
 
@@ -217,18 +268,62 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 value: _category,
                 decoration: InputDecoration(
                   labelText: _languageService.translate('category'),
-                  prefixIcon: Icon(Icons.category, color: Colors.blueAccent),
+                  prefixIcon: const Icon(Icons.category, color: Colors.blueAccent),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
                 ),
-                items: categories.map((String category) {
+                items: _currentCategories.map((category) {
                   return DropdownMenuItem<String>(
-                    value: category,
-                    child: Text(_languageService.translate(category)),
+                    value: category['name'],
+                    child: Text(category['name']),
                   );
                 }).toList(),
-                onChanged: (value) => setState(() => _category = value!),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _category = value;
+                    });
+                  }
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return _languageService.translate('selectCategory');
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              
+              // Wallet Dropdown
+              DropdownButtonFormField<int>(
+                value: _walletId,
+                decoration: InputDecoration(
+                  labelText: _languageService.translate('wallet'),
+                  prefixIcon: const Icon(Icons.account_balance_wallet, color: Colors.blueAccent),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
+                items: _wallets.map((wallet) {
+                  return DropdownMenuItem<int>(
+                    value: wallet['id'] as int,
+                    child: Text('${wallet['name']} (${wallet['balance']})'),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _walletId = value;
+                    });
+                  }
+                },
+                validator: (value) {
+                  if (value == null) {
+                    return _languageService.translate('selectWallet');
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 20),
 
@@ -236,17 +331,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ListTile(
                 title: Text(
                   _languageService.translate('date'),
-                  style: TextStyle(color: Colors.blueAccent),
+                  style: const TextStyle(color: Colors.blueAccent),
                 ),
                 subtitle: Text(
                   _selectedDate.toLocal().toString().split(' ')[0],
-                  style: TextStyle(fontSize: 16),
+                  style: const TextStyle(fontSize: 16),
                 ),
-                trailing: Icon(Icons.calendar_today, color: Colors.blueAccent),
+                trailing: const Icon(Icons.calendar_today, color: Colors.blueAccent),
                 onTap: () => _selectDate(context),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10.0),
-                  side: BorderSide(color: Colors.blueAccent),
+                  side: const BorderSide(color: Colors.blueAccent),
                 ),
               ),
               const SizedBox(height: 30),
@@ -256,14 +351,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 onPressed: _saveTransaction,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blueAccent,
-                  padding: EdgeInsets.symmetric(vertical: 15),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
                 ),
                 child: Text(
                   _languageService.translate('save'),
-                  style: TextStyle(fontSize: 18, color: Colors.white),
+                  style: const TextStyle(fontSize: 18, color: Colors.white),
                 ),
               ),
 
@@ -271,7 +366,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 onPressed: () => Navigator.pop(context),
                 child: Text(
                   _languageService.translate('cancel'),
-                  style: TextStyle(color: Colors.blueAccent),
+                  style: const TextStyle(color: Colors.blueAccent),
                 ),
               ),
             ],
