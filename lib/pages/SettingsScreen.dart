@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/services/language_service.dart';
 import 'package:personal_finance/services/theme_service.dart';
-import 'package:personal_finance/pages/AppLockScreen.dart';
 
 
 class SettingsScreen extends StatefulWidget {
@@ -171,57 +170,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               
-              const SizedBox(height: 16),
-              
-              // App Lock Setting
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)
-                ),
-                child: ListTile(
-                  leading: const Icon(Icons.lock, color: Colors.deepPurple),
-                  title: Text(
-                    _languageService.translate('appLock'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    _languageService.translate('appLockSubtitle'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
-                    ),
-                  ),
-                  onTap: () => _navigateToAppLockScreen(),
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Logout Button
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)
-                ),
-                child: ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: Text(
-                    _languageService.translate('logout'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onTap: _showLogoutConfirmation,
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              const Divider(), // Keep only this divider
               const SizedBox(height: 16),
               
               // Reset Data Button
@@ -422,59 +370,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  // Show logout confirmation dialog
-  Future<void> _showLogoutConfirmation() async {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(_languageService.translate('logoutConfirmation')),
-          content: Text(_languageService.translate('areYouSureLogout')),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(_languageService.translate('cancel')),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                await _logout();
-              },
-              child: Text(
-                _languageService.translate('logout'),
-                style: const TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-  
-  // Logout user
-  Future<void> _logout() async {
-    try {
-      final db = await _dbHelper.database;
-      // Set all users as logged out
-      await db.update('user', {'is_logged_in': 0, 'remember_me': 0});
-      
-      // Navigate to login screen
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-      }
-    } catch (e) {
-      print('Error logging out: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_languageService.translate('logoutError')),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   // Show reset confirmation dialog
   Future<void> _showResetConfirmation() async {
     showDialog(
@@ -564,15 +459,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     }
-  }
-
-  Future<void> _navigateToAppLockScreen() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const AppLockScreen(),
-      ),
-    );
   }
 }
 

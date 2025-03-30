@@ -1,23 +1,21 @@
 import 'package:flutter/material.dart';
-import 'database/database_helper.dart';
-import 'pages/HomeScreen.dart';
-import 'pages/LogingRegister.dart';
-import 'pages/ReportsScreen.dart';
-import 'pages/SettingsScreen.dart';
-import 'pages/TransactionHistoryScreen.dart'; // Import the MainNavigationScreen
-import 'services/language_service.dart';
-import 'services/theme_service.dart';
+import 'package:flutter/services.dart';
+import 'package:personal_finance/database/database_helper.dart';
+import 'package:personal_finance/pages/HomeScreen.dart';
+import 'package:personal_finance/pages/TransactionHistoryScreen.dart';
+import 'package:personal_finance/pages/ReportsScreen.dart';
+import 'package:personal_finance/pages/SettingsScreen.dart';
+import 'package:personal_finance/pages/LogingRegister.dart';
+import 'package:personal_finance/pages/CategoryScreen.dart';
+import 'package:personal_finance/services/language_service.dart';
+import 'package:personal_finance/services/theme_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:personal_finance/services/security_service.dart';
-import 'pages/LockScreen.dart';
-// Add this if needed for GlobalCupertinoLocalizations
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final dbHelper = DatabaseHelper();
   final languageService = LanguageService();
   final themeService = ThemeService();
-  final securityService = SecurityService();
   
   try {
     await dbHelper.database;
@@ -29,7 +27,6 @@ void main() async {
     // Initialize services
     await languageService.initLanguage();
     await themeService.initTheme();
-    await securityService.initialize(); // Initialize security settings
   } catch (e) {
     print("Error initializing: $e");
   }
@@ -197,15 +194,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   ];
 
   final LanguageService _languageService = LanguageService();
-  final SecurityService _securityService = SecurityService();
   
-  bool _isLocked = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this); // Add lifecycle observer
-    _securityService.recordLastAccess(); // Record app start time
   }
   
   @override
@@ -217,48 +210,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     print('App lifecycle state changed to: $state');
-    
-    if (state == AppLifecycleState.resumed) {
-      print('App resumed - checking for lock');
-      _checkLock();
-    } else if (state == AppLifecycleState.paused) {
-      // Record last time the app was used
-      print('App paused - recording access time');
-      _securityService.recordLastAccess();
-    }
-  }
-  
-  Future<void> _checkLock() async {
-    final shouldLock = await _securityService.shouldLockApp();
-    print('Should lock app? $shouldLock');
-    
-    if (shouldLock && !_isLocked) {
-      print('Showing lock screen');
-      setState(() {
-        _isLocked = true;
-      });
-      
-      // Show lock screen
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const LockScreen(),
-          fullscreenDialog: true,
-        ),
-      );
-      
-      setState(() {
-        _isLocked = false;
-      });
-      
-      if (result != true) {
-        // If authentication failed or was canceled, exit the app
-        // This is a failsafe but should not normally happen due to the WillPopScope in LockScreen
-        print('Lock screen dismissed without successful authentication');
-      } else {
-        print('Authentication successful');
-      }
-    }
   }
 
   void _onItemTapped(int index) {

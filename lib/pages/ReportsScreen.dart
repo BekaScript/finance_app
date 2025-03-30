@@ -54,6 +54,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<Map<String, dynamic>> _loadData() async {
     try {
       final db = await _dbHelper.database;
+      
+      // Ensure dates are initialized if null
+      final now = DateTime.now();
+      final start = selectedStartDate ?? DateTime(now.year, now.month, 1);
+      final end = selectedEndDate ?? DateTime(now.year, now.month + 1, 0);
 
       // First load total income and expenses for the period
       final incomeTotal = await db.rawQuery('''
@@ -65,8 +70,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         AND date BETWEEN ? AND ?
         GROUP BY date
       ''', [
-        selectedStartDate!.toIso8601String().substring(0, 10),
-        selectedEndDate!.toIso8601String().substring(0, 10),
+        start.toIso8601String().substring(0, 10),
+        end.toIso8601String().substring(0, 10),
       ]);
 
       final expenseTotal = await db.rawQuery('''
@@ -78,8 +83,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         AND date BETWEEN ? AND ?
         GROUP BY date
       ''', [
-        selectedStartDate!.toIso8601String().substring(0, 10),
-        selectedEndDate!.toIso8601String().substring(0, 10),
+        start.toIso8601String().substring(0, 10),
+        end.toIso8601String().substring(0, 10),
       ]);
 
       // Process daily data
@@ -100,8 +105,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       String whereClause = "type = ? AND date BETWEEN ? AND ?";
       List<dynamic> whereArgs = [
         selectedType,
-        selectedStartDate!.toIso8601String().substring(0, 10),
-        selectedEndDate!.toIso8601String().substring(0, 10),
+        start.toIso8601String().substring(0, 10),
+        end.toIso8601String().substring(0, 10),
       ];
 
       final transactions = await db.query(
@@ -134,11 +139,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
         "categoryPercentages": categoryPercentages,
         "total": typeTotal,
         "incomeTotal": (incomeTotal.isEmpty
-            ? 0
+            ? 0.0
             : incomeTotal.fold(0.0,
                 (sum, row) => sum + (row['daily_total'] as num).toDouble())),
         "expenseTotal": (expenseTotal.isEmpty
-            ? 0
+            ? 0.0
             : expenseTotal.fold(0.0,
                 (sum, row) => sum + (row['daily_total'] as num).toDouble())),
         "dailyIncome": dailyIncome,
@@ -152,114 +157,103 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Financial Report',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF1A237E), Color(0xFF64B5F6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body: Container(
         color: Theme.of(context).colorScheme.background,
         child: Column(
           children: [
-            // Header with date range and chart toggle
+            // Date range and chart toggle
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
+                border: Border(
+                  bottom: BorderSide(
+                    color: Theme.of(context).dividerColor,
+                    width: 1,
                   ),
-                ],
+                ),
               ),
-              child: Column(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Financial Report',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
+                      Icon(
+                        Icons.date_range,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.pie_chart),
-                            color: _chartType == ChartType.pie
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withOpacity(0.5),
-                            onPressed: () {
-                              setState(() {
-                                _chartType = ChartType.pie;
-                              });
-                            },
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.bar_chart),
-                            color: _chartType == ChartType.bar
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withOpacity(0.5),
-                            onPressed: () {
-                              setState(() {
-                                _chartType = ChartType.bar;
-                              });
-                            },
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.calendar_today),
-                            onPressed: () async {
-                              final DateTimeRange? dateRange =
-                                  await showDateRangePicker(
-                                context: context,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime.now(),
-                                initialDateRange: DateTimeRange(
-                                  start: selectedStartDate!,
-                                  end: selectedEndDate!,
-                                ),
-                                builder: (context, child) {
-                                  return Theme(
-                                    data: Theme.of(context).copyWith(
-                                      colorScheme: ColorScheme.light(
-                                        primary: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                      ),
-                                    ),
-                                    child: child!,
-                                  );
-                                },
-                              );
-                              if (dateRange != null) {
-                                setState(() {
-                                  selectedStartDate = dateRange.start;
-                                  selectedEndDate = dateRange.end;
-                                  _reportsFuture = _loadData();
-                                });
-                              }
-                            },
-                          ),
-                        ],
+                      const SizedBox(width: 8),
+                      Text(
+                        '${DateFormat('MMM d, y').format(selectedStartDate ?? DateTime.now())} - ${DateFormat('MMM d, y').format(selectedEndDate ?? DateTime.now())}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${DateFormat('MMM d, y').format(selectedStartDate!)} - ${DateFormat('MMM d, y').format(selectedEndDate!)}',
-                    style: TextStyle(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.7),
-                      fontSize: 14,
-                    ),
+                  IconButton(
+                    icon: Icon(Icons.calendar_today),
+                    color: Theme.of(context).colorScheme.primary,
+                    onPressed: () async {
+                      try {
+                        final now = DateTime.now();
+                        final DateTimeRange? dateRange = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(now.year, now.month + 1, 0),
+                          initialDateRange: DateTimeRange(
+                            start: selectedStartDate ?? DateTime(now.year, now.month, 1),
+                            end: selectedEndDate ?? now,
+                          ),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (dateRange != null) {
+                          print('Date range selected: ${dateRange.start} to ${dateRange.end}');
+                          setState(() {
+                            selectedStartDate = dateRange.start;
+                            selectedEndDate = dateRange.end;
+                            _reportsFuture = _loadData();
+                          });
+                        }
+                      } catch (e) {
+                        print('Error selecting date range: $e');
+                      }
+                    },
+                    iconSize: 20,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(),
                   ),
                 ],
               ),
@@ -307,31 +301,40 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                   return Column(
                     children: [
-                      // Summary Cards
+                      // Chart type selector
                       Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Income Card
-                            Expanded(
-                              child: _buildSummaryCard(
-                                context,
-                                title: 'Income',
-                                amount: incomeTotal,
-                                color: Colors.green,
-                                icon: Icons.arrow_upward,
+                            IconButton(
+                              icon: Icon(
+                                Icons.pie_chart,
+                                size: 24,
+                                color: _chartType == ChartType.pie
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                               ),
+                              onPressed: () {
+                                setState(() {
+                                  _chartType = ChartType.pie;
+                                });
+                              },
                             ),
-                            const SizedBox(width: 12),
-                            // Expense Card
-                            Expanded(
-                              child: _buildSummaryCard(
-                                context,
-                                title: 'Expenses',
-                                amount: expenseTotal,
-                                color: Colors.red,
-                                icon: Icons.arrow_downward,
+                            const SizedBox(width: 16),
+                            IconButton(
+                              icon: Icon(
+                                Icons.bar_chart,
+                                size: 24,
+                                color: _chartType == ChartType.bar
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                               ),
+                              onPressed: () {
+                                setState(() {
+                                  _chartType = ChartType.bar;
+                                });
+                              },
                             ),
                           ],
                         ),
@@ -639,14 +642,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
     } else {
       // Bar chart
+      // Check if there's data to display
+      if (dailyIncome.isEmpty && dailyExpense.isEmpty) {
+        return Center(
+          child: Text(
+            'No transaction data for selected period',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        );
+      }
+      
+      // Calculate max Y value safely
+      double maxY = 100.0; // Default value if no data
+      if (dailyIncome.isNotEmpty || dailyExpense.isNotEmpty) {
+        final allValues = [...dailyIncome.values, ...dailyExpense.values];
+        if (allValues.isNotEmpty) {
+          maxY = allValues.reduce((max, value) => value > max ? value : max) * 1.2;
+        }
+      }
+      
       return BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceBetween,
-          maxY: [
-                ...dailyIncome.values,
-                ...dailyExpense.values,
-              ].reduce((max, value) => value > max ? value : max) *
-              1.2,
+          maxY: maxY,
           titlesData: FlTitlesData(
             show: true,
             bottomTitles: AxisTitles(

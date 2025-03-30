@@ -51,9 +51,9 @@ class LanguageService {
   };
   
   Map<String, Map<String, String>> translations = {
-    'en': enTranslations,
-    'ru': ruTranslations,
-    'ky': kyTranslations,
+    'en': en,
+    'ru': ru,
+    'ky': ky,
   };
   
   Future<void> setLanguage(String languageCode) async {
