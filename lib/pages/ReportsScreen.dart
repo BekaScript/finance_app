@@ -60,6 +60,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       final now = DateTime.now();
       final start = selectedStartDate ?? DateTime(now.year, now.month, 1);
       final end = selectedEndDate ?? DateTime(now.year, now.month + 1, 0);
+      
+      // Ensure the end date includes the entire day by setting it to end of day
+      final adjustedEnd = DateTime(end.year, end.month, end.day, 23, 59, 59);
 
       // First load total income and expenses for the period
       final incomeTotal = await db.rawQuery('''
@@ -70,7 +73,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         GROUP BY date
       ''', [
         start.toIso8601String().substring(0, 10),
-        end.toIso8601String().substring(0, 10),
+        adjustedEnd.toIso8601String().substring(0, 10),
       ]);
 
       final expenseTotal = await db.rawQuery('''
@@ -81,7 +84,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         GROUP BY date
       ''', [
         start.toIso8601String().substring(0, 10),
-        end.toIso8601String().substring(0, 10),
+        adjustedEnd.toIso8601String().substring(0, 10),
       ]);
 
       // Process daily data
@@ -90,12 +93,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       for (var row in incomeTotal) {
         String date = row['date'] as String;
-        dailyIncome[date] = (row['daily_total'] as num).toDouble();
+        // Normalize the date to YYYY-MM-DD format to ensure consistency
+        String normalizedDate = date;
+        try {
+          final dateObj = DateTime.parse(date);
+          normalizedDate = "${dateObj.year}-${dateObj.month.toString().padLeft(2, '0')}-${dateObj.day.toString().padLeft(2, '0')}";
+        } catch (e) {
+          print("Error normalizing date: $e");
+        }
+        dailyIncome[normalizedDate] = (row['daily_total'] as num).toDouble();
       }
 
       for (var row in expenseTotal) {
         String date = row['date'] as String;
-        dailyExpense[date] = (row['daily_total'] as num).toDouble();
+        // Normalize the date to YYYY-MM-DD format to ensure consistency
+        String normalizedDate = date;
+        try {
+          final dateObj = DateTime.parse(date);
+          normalizedDate = "${dateObj.year}-${dateObj.month.toString().padLeft(2, '0')}-${dateObj.day.toString().padLeft(2, '0')}";
+        } catch (e) {
+          print("Error normalizing date: $e");
+        }
+        dailyExpense[normalizedDate] = (row['daily_total'] as num).toDouble();
       }
 
       // Load category data for selected type
@@ -103,7 +122,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       List<dynamic> whereArgs = [
         selectedType,
         start.toIso8601String().substring(0, 10),
-        end.toIso8601String().substring(0, 10),
+        adjustedEnd.toIso8601String().substring(0, 10),
       ];
 
       final transactions = await db.query(
@@ -912,7 +931,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         String formattedAmount = '$_currencySymbol${rod.toY.toStringAsFixed(0)}';
                         String date = allDates[group.x.toInt()];
                         // Format date to be more readable
-                        String formattedDate = DateFormat('MMM d').format(DateTime.parse(date));
+                        String formattedDate = DateFormat('dd-MM').format(DateTime.parse(date));
                         return BarTooltipItem(
                           '$formattedDate\n$formattedAmount',
                           TextStyle(
@@ -937,7 +956,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             if (value.toInt() % interval == 0 || value.toInt() == allDates.length - 1) {
                               final date = allDates[value.toInt()];
                               // Format date to be more readable
-                              String formattedDate = DateFormat('d').format(DateTime.parse(date));
+                              String formattedDate = DateFormat('dd-MM').format(DateTime.parse(date));
                               return Padding(
                                 padding: const EdgeInsets.only(top: 8.0),
                                 child: Text(
@@ -1026,8 +1045,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   List<BarChartGroupData> _createBarGroups(
       Map<String, double> dailyIncome, Map<String, double> dailyExpense) {
-    final allDates = {...dailyIncome.keys, ...dailyExpense.keys}.toList()
-      ..sort();
+    // Sort dates to ensure consistent order
+    final allDates = {...dailyIncome.keys, ...dailyExpense.keys}.toList()..sort();
+
+    // Debug - print out the dates to check for duplicates or format issues
+    print('Dates in chart: $allDates');
 
     return List.generate(allDates.length, (index) {
       final date = allDates[index];
@@ -1042,6 +1064,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         value = dailyExpense[date] ?? 0;
         barColor = Colors.red.withOpacity(0.7);
       }
+
+      // Debug - print each bar's date and value
+      print('Bar at index $index: Date=$date, Value=$value');
 
       return BarChartGroupData(
         x: index,
