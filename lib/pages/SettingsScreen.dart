@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:personal_finance/database/database_helper.dart';
-import 'package:personal_finance/services/language_service.dart';
-import 'package:personal_finance/services/theme_service.dart';
-import 'package:personal_finance/pages/LogingRegister.dart';
-import 'package:personal_finance/services/csv_service.dart';
+import 'package:nur_budget/database/database_helper.dart';
+import 'package:nur_budget/services/language_service.dart';
+import 'package:nur_budget/services/theme_service.dart';
+import 'package:nur_budget/pages/LogingRegister.dart';
+import 'package:nur_budget/services/csv_service.dart';
 import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';

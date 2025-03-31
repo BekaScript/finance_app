@@ -10,22 +10,30 @@ class CsvService {
   final LanguageService _languageService = LanguageService();
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
-  // Получение пути к директории документов
+  // Get path to Downloads directory
   Future<String> get _localPath async {
+    if (Platform.isAndroid) {
+      final directory = Directory('/storage/emulated/0/Download');
+      if (await directory.exists()) {
+        return directory.path;
+      }
+    }
+    // Fallback to documents directory if Downloads is not accessible
     final directory = await getApplicationDocumentsDirectory();
     return directory.path;
   }
 
-  // Получение файла CSV
-  Future<File> get _localFile async {
+  // Get CSV file with proper naming
+  Future<File> _getExportFile(String prefix) async {
     final path = await _localPath;
-    return File('$path/transactions.csv');
+    final timestamp = DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now());
+    return File('$path/${prefix}_$timestamp.csv');
   }
 
   // Добавление транзакции в CSV
   Future<void> addTransactionToCsv(Map<String, dynamic> transaction) async {
     try {
-      File file = await _localFile;
+      final file = await _getExportFile('transactions');
       bool fileExists = await file.exists();
 
       // Создаем заголовки, если файл новый
@@ -62,7 +70,7 @@ class CsvService {
   // Чтение всех транзакций из CSV
   Future<List<List<dynamic>>> readTransactionsFromCsv() async {
     try {
-      File file = await _localFile;
+      final file = await _getExportFile('transactions');
       bool fileExists = await file.exists();
 
       if (!fileExists) {
@@ -86,10 +94,8 @@ class CsvService {
   Future<String> exportTransactionHistory(
       DateTime startDate, DateTime endDate, String currency) async {
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName =
-          'transaction_history_${DateTime.now().millisecondsSinceEpoch}.csv';
-      final file = File('${directory.path}/$fileName');
+      final fileName = 'finance_report_${DateFormat('yyyy-MM-dd').format(startDate)}_to_${DateFormat('yyyy-MM-dd').format(endDate)}';
+      final file = await _getExportFile(fileName);
 
       // Get transaction history data
       final history = await _dbHelper.getTransactionHistory(startDate, endDate);
@@ -135,8 +141,7 @@ class CsvService {
         'Income by Category',
       ]);
 
-      final incomeByCategory =
-          history['incomeByCategory'] as Map<String, double>;
+      final incomeByCategory = history['incomeByCategory'] as Map<String, double>;
       for (var entry in incomeByCategory.entries) {
         csvData.add([
           entry.key,
@@ -150,8 +155,7 @@ class CsvService {
         'Expense by Category',
       ]);
 
-      final expenseByCategory =
-          history['expenseByCategory'] as Map<String, double>;
+      final expenseByCategory = history['expenseByCategory'] as Map<String, double>;
       for (var entry in expenseByCategory.entries) {
         csvData.add([
           entry.key,
@@ -175,8 +179,7 @@ class CsvService {
       ]);
 
       // Add transaction data
-      final transactions =
-          history['transactions'] as List<Map<String, dynamic>>;
+      final transactions = history['transactions'] as List<Map<String, dynamic>>;
       for (var transaction in transactions) {
         csvData.add([
           transaction['date'],
@@ -200,15 +203,13 @@ class CsvService {
     }
   }
 
-  // Экспорт всех транзакций в новый CSV файл
-  Future<String> exportTransactions(
-      List<Map<String, dynamic>> transactions) async {
+  // Export all transactions to a new CSV file
+  Future<String> exportTransactions(List<Map<String, dynamic>> transactions) async {
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = 'export_${DateTime.now().millisecondsSinceEpoch}.csv';
-      final file = File('${directory.path}/$fileName');
+      final fileName = 'finance_transactions';
+      final file = await _getExportFile(fileName);
 
-      // Создаем заголовки
+      // Create headers
       final header = [
         _languageService.translate('type'),
         _languageService.translate('category'),
@@ -217,7 +218,7 @@ class CsvService {
         _languageService.translate('description'),
       ];
 
-      // Преобразуем транзакции в список строк CSV
+      // Convert transactions to CSV rows
       List<List<dynamic>> csvData = [header];
 
       for (var transaction in transactions) {
@@ -230,14 +231,14 @@ class CsvService {
         ]);
       }
 
-      // Конвертируем и сохраняем
+      // Convert and save
       String csv = const ListToCsvConverter().convert(csvData);
       await file.writeAsString(csv);
 
       return file.path;
     } catch (e) {
       if (kDebugMode) {
-        print('Ошибка при экспорте транзакций: $e');
+        print('Error exporting transactions: $e');
       }
       return '';
     }
@@ -246,7 +247,7 @@ class CsvService {
   // Удаление CSV файла при сбросе данных
   Future<void> resetCsvData() async {
     try {
-      File file = await _localFile;
+      final file = await _getExportFile('transactions');
       if (await file.exists()) {
         await file.delete();
       }

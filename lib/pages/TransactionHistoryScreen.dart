@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:personal_finance/database/database_helper.dart';
+import 'package:nur_budget/database/database_helper.dart';
 import 'AddTransactionScreen.dart';
 import '../utils/currency_utils.dart';
 import '../services/language_service.dart';
@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -456,9 +457,58 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
+  // Request storage permission
+  Future<bool> _requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      final status = await Permission.storage.request();
+      if (status.isGranted) {
+        return true;
+      }
+      
+      // Show explanation dialog if permission was denied
+      if (mounted && status.isDenied) {
+        final bool shouldRequest = await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(_languageService.translate('storagePermission')),
+            content: Text(_languageService.translate('storagePermissionReason')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(_languageService.translate('cancel')),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(_languageService.translate('grantAccess')),
+              ),
+            ],
+          ),
+        ) ?? false;
+
+        if (shouldRequest) {
+          final newStatus = await Permission.storage.request();
+          return newStatus.isGranted;
+        }
+      }
+      return false;
+    }
+    return true;
+  }
+
   // Export transactions to CSV
   Future<void> _exportTransactions() async {
     try {
+      // Request storage permission first
+      final hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_languageService.translate('storagePermissionDenied'))),
+          );
+        }
+        return;
+      }
+
       setState(() {
         _isExporting = true;
       });

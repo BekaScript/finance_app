@@ -1,7 +1,7 @@
 // ignore: file_names
 import 'package:flutter/material.dart';
-import 'package:personal_finance/database/database_helper.dart';
-import 'package:personal_finance/services/language_service.dart';
+import 'package:nur_budget/database/database_helper.dart';
+import 'package:nur_budget/services/language_service.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final Map<String, dynamic>? transaction; // Accepts transaction for editing

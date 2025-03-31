@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:personal_finance/database/database_helper.dart';
-import 'package:personal_finance/pages/HomeScreen.dart';
-import 'package:personal_finance/pages/TransactionHistoryScreen.dart';
-import 'package:personal_finance/pages/ReportsScreen.dart';
-import 'package:personal_finance/pages/SettingsScreen.dart';
-import 'package:personal_finance/pages/LogingRegister.dart';
-import 'package:personal_finance/services/language_service.dart';
-import 'package:personal_finance/services/theme_service.dart';
+import 'package:nur_budget/database/database_helper.dart';
+import 'package:nur_budget/pages/HomeScreen.dart';
+import 'package:nur_budget/pages/TransactionHistoryScreen.dart';
+import 'package:nur_budget/pages/ReportsScreen.dart';
+import 'package:nur_budget/pages/SettingsScreen.dart';
+import 'package:nur_budget/pages/LogingRegister.dart';
+import 'package:nur_budget/services/language_service.dart';
+import 'package:nur_budget/services/theme_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 

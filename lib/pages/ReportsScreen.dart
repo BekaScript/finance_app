@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:personal_finance/database/database_helper.dart';
-import 'package:personal_finance/utils/currency_utils.dart';
-import 'package:personal_finance/services/language_service.dart';
+import 'package:nur_budget/database/database_helper.dart';
+import 'package:nur_budget/utils/currency_utils.dart';
+import 'package:nur_budget/services/language_service.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 

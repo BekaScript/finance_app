@@ -1,5 +1,5 @@
-name: personal_finance
-description: "A new Flutter project."
+name: nur_budget
+description: "A personal finance management app to track income, expenses, and budgets."
 
 publish_to: 'none' 
 
@@ -25,7 +25,11 @@ dependencies:
   local_auth: ^2.1.6
   shared_preferences: ^2.1.1
   csv: ^5.0.1
+  provider: ^6.1.4
   path_provider: ^2.0.15
+  share_plus: ^10.1.4
+  cross_file: ^0.3.4+2
+  permission_handler: ^11.3.0
 
 dev_dependencies:
   flutter_test:

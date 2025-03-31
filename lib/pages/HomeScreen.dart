@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:personal_finance/pages/AddTransactionScreen.dart';
-import 'package:personal_finance/database/database_helper.dart';
-import 'package:personal_finance/pages/LogingRegister.dart';
-import 'package:personal_finance/widgets/summary_card.dart';
+import 'package:nur_budget/pages/AddTransactionScreen.dart';
+import 'package:nur_budget/database/database_helper.dart';
+import 'package:nur_budget/pages/LogingRegister.dart';
+import 'package:nur_budget/widgets/summary_card.dart';
 import '../utils/currency_utils.dart';
 import '../services/language_service.dart';
 import '../pages/CategoryScreen.dart';
