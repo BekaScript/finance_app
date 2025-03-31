@@ -135,8 +135,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: Icons.file_download,
                       iconColor: colorScheme.primary,
                       title: _languageService.translate('exportData'),
-                      subtitle:
-                          _languageService.translate('exportDataDescription'),
                       onTap: _showExportOptionsDialog,
                     ),
                     const Divider(height: 1),
