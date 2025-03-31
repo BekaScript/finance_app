@@ -3,6 +3,10 @@ import 'package:personal_finance/database/database_helper.dart';
 import 'AddTransactionScreen.dart';
 import '../utils/currency_utils.dart';
 import '../services/language_service.dart';
+import '../services/csv_service.dart';
+import 'package:intl/intl.dart';
+import 'dart:io';
+import 'package:share_plus/share_plus.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -14,11 +18,18 @@ class TransactionHistoryScreen extends StatefulWidget {
 
 class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   String _currencySymbol = '\$';
+  String _currency = 'USD';
   final DatabaseHelper _dbHelper = DatabaseHelper();
+  final CsvService _csvService = CsvService();
   List<Map<String, dynamic>> _transactions = [];
   String _searchQuery = "";
   String _filterType = "All";
   final LanguageService _languageService = LanguageService();
+
+  // Date range for exports
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
+  DateTime _endDate = DateTime.now();
+  bool _isExporting = false;
 
   @override
   void initState() {
@@ -36,12 +47,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   Future<void> _loadTransactions() async {
     try {
       final transactions = await _dbHelper.getTransactions();
-      
+
       print("Загружено ${transactions.length} транзакций в историю транзакций");
       if (transactions.isNotEmpty) {
         print("Первая транзакция: ${transactions.first}");
       }
-      
+
       setState(() {
         _transactions = transactions;
       });
@@ -57,6 +68,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     final currency = await _dbHelper.getCurrency();
     if (mounted) {
       setState(() {
+        _currency = currency;
         _currencySymbol = getCurrencySymbol(currency);
       });
     }
@@ -75,8 +87,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(_languageService.translate('delete'), 
-              style: const TextStyle(color: Colors.red)),
+            child: Text(_languageService.translate('delete'),
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -118,6 +130,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.file_download, color: Colors.white),
+            onPressed: () => _showExportDialog(),
+            tooltip: _languageService.translate('exportToCsv'),
+          ),
+          IconButton(
             icon: const Icon(Icons.filter_list, color: Colors.white),
             onPressed: () => _showFilterModal(),
           ),
@@ -135,27 +152,40 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       ),
       body: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark 
+          color: Theme.of(context).brightness == Brightness.dark
               ? Colors.black.withAlpha(179)
               : Colors.white.withAlpha(179),
         ),
-        child: Column(
+        child: Stack(
           children: [
-            _buildSearchBar(),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadTransactions,
-                child: filteredTransactions.isEmpty
-                    ? Center(child: Text(_languageService.translate('noTransactionFound')))
-                    : ListView.builder(
-                        itemCount: filteredTransactions.length,
-                        itemBuilder: (context, index) {
-                          final transaction = filteredTransactions[index];
-                          return _buildTransactionCard(transaction);
-                        },
-                      ),
-              ),
+            Column(
+              children: [
+                _buildSearchBar(),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _loadTransactions,
+                    child: filteredTransactions.isEmpty
+                        ? Center(
+                            child: Text(_languageService
+                                .translate('noTransactionFound')))
+                        : ListView.builder(
+                            itemCount: filteredTransactions.length,
+                            itemBuilder: (context, index) {
+                              final transaction = filteredTransactions[index];
+                              return _buildTransactionCard(transaction);
+                            },
+                          ),
+                  ),
+                ),
+              ],
             ),
+            if (_isExporting)
+              Container(
+                color: Colors.black54,
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
           ],
         ),
       ),
@@ -241,11 +271,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             ),
           ),
           trailing: Text(
-            transaction['type'] == 'expense' ? 
-              '-$_currencySymbol${transaction['amount'].toStringAsFixed(2)}' :
-              '+$_currencySymbol${transaction['amount'].toStringAsFixed(2)}',
+            transaction['type'] == 'expense'
+                ? '-$_currencySymbol${transaction['amount'].toStringAsFixed(2)}'
+                : '+$_currencySymbol${transaction['amount'].toStringAsFixed(2)}',
             style: TextStyle(
-              color: transaction['type'] == 'expense' ? Colors.red : Colors.green,
+              color:
+                  transaction['type'] == 'expense' ? Colors.red : Colors.green,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -276,8 +307,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                 Navigator.pop(context);
                 await _deleteTransaction(transaction['id']);
               },
-              child: Text(_languageService.translate('delete'), 
-                style: const TextStyle(color: Colors.red)),
+              child: Text(_languageService.translate('delete'),
+                  style: const TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -310,18 +341,26 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             children: [
               Text(
                 _languageService.translate('filters'),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _filterType,
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 items: [
-                  DropdownMenuItem(value: "All", child: Text(_languageService.translate('all'))),
-                  DropdownMenuItem(value: "Income", child: Text(_languageService.translate('income'))),
-                  DropdownMenuItem(value: "Expense", child: Text(_languageService.translate('expenses'))),
+                  DropdownMenuItem(
+                      value: "All",
+                      child: Text(_languageService.translate('all'))),
+                  DropdownMenuItem(
+                      value: "Income",
+                      child: Text(_languageService.translate('income'))),
+                  DropdownMenuItem(
+                      value: "Expense",
+                      child: Text(_languageService.translate('expenses'))),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -335,5 +374,165 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         );
       },
     );
+  }
+
+  // Show dialog to export transactions to CSV
+  void _showExportDialog() {
+    final DateFormat dateFormat = DateFormat('MMM dd, yyyy');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: Text(_languageService.translate('exportToCsv')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_languageService.translate('selectDateRange')),
+                const SizedBox(height: 16),
+
+                // Start date picker
+                ListTile(
+                  title: Text(_languageService.translate('startDate')),
+                  subtitle: Text(dateFormat.format(_startDate)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: _startDate,
+                      firstDate: DateTime(2020),
+                      lastDate: _endDate,
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _startDate = picked;
+                      });
+                    }
+                  },
+                ),
+
+                // End date picker
+                ListTile(
+                  title: Text(_languageService.translate('endDate')),
+                  subtitle: Text(dateFormat.format(_endDate)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: _endDate,
+                      firstDate: _startDate,
+                      lastDate: DateTime.now().add(const Duration(days: 1)),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _endDate = picked;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(_languageService.translate('cancel')),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _exportTransactions();
+                },
+                child: Text(_languageService.translate('export')),
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
+
+  // Export transactions to CSV
+  Future<void> _exportTransactions() async {
+    try {
+      setState(() {
+        _isExporting = true;
+      });
+
+      final filePath = await _csvService.exportTransactionHistory(
+          _startDate, _endDate, _currency);
+
+      setState(() {
+        _isExporting = false;
+      });
+
+      if (filePath.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_languageService.translate('exportFailed'))),
+          );
+        }
+        return;
+      }
+
+      // Show success message and share options
+      if (mounted) {
+        _showExportSuccessDialog(filePath);
+      }
+    } catch (e) {
+      setState(() {
+        _isExporting = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  // Show success dialog with share option
+  void _showExportSuccessDialog(String filePath) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_languageService.translate('exportSuccess')),
+        content: Text(_languageService
+            .translate('fileSavedTo')
+            .replaceAll('{path}', filePath)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_languageService.translate('ok')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _shareExportedFile(filePath);
+            },
+            child: Text(_languageService.translate('share')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Share the exported file
+  Future<void> _shareExportedFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: _languageService.translate('transactionHistory'),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sharing file: $e')),
+        );
+      }
+    }
   }
 }
