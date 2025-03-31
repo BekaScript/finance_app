@@ -477,21 +477,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   }).toList(),
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              ElevatedButton.icon(
-                                onPressed: () => _showAddWalletDialog(),
-                                icon: const Icon(Icons.add, size: 16),
-                                label: Text(_languageService.translate('addWallet')),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.deepPurple[50],
-                                  foregroundColor: Colors.deepPurple[900],
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  minimumSize: const Size(100, 30),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
                             ],
                           );
                         },

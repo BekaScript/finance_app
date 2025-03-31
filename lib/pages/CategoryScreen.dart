@@ -340,40 +340,53 @@ class _CategoryScreenState extends State<CategoryScreen> with SingleTickerProvid
       );
     }
     
-    return ListView.builder(
-      itemCount: _wallets.length,
-      itemBuilder: (context, index) {
-        final wallet = _wallets[index];
-        final balance = wallet['balance'] as double;
-        
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            title: Text(wallet['name']),
-            subtitle: Text(
-              '$_currencySymbol${balance.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: balance >= 0 ? Colors.green : Colors.red,
-              ),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () => _showAddWalletDialog(wallet: wallet),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _wallets.isEmpty
+            ? Expanded(
+                child: Center(
+                  child: Text(_languageService.translate('noWallets')),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _deleteWallet(wallet),
-                ),
-              ],
+              )
+            : Expanded(
+                child: ListView.builder(
+                   itemCount: _wallets.length,
+                   itemBuilder: (context, index) {
+                     final wallet = _wallets[index];
+                     final balance = wallet['balance'] as double;
+                     
+                     return Card(
+                       elevation: 2,
+                       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                       child: ListTile(
+                         title: Text(wallet['name']),
+                         subtitle: Text(
+                           '$_currencySymbol${balance.toStringAsFixed(2)}',
+                           style: TextStyle(
+                             fontWeight: FontWeight.bold,
+                             color: balance >= 0 ? Colors.green : Colors.red,
+                           ),
+                         ),
+                         trailing: Row(
+                           mainAxisSize: MainAxisSize.min,
+                           children: [
+                             IconButton(
+                               icon: const Icon(Icons.edit, color: Colors.blue),
+                               onPressed: () => _showAddWalletDialog(wallet: wallet),
+                             ),
+                             IconButton(
+                               icon: const Icon(Icons.delete, color: Colors.red),
+                               onPressed: () => _deleteWallet(wallet),
+                             ),
+                           ],
+                         ),
+                       ),
+                     );
+                   },
+                 ),
             ),
-          ),
-        );
-      },
+      ],
     );
   }
   

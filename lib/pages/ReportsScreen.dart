@@ -630,7 +630,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               badgeWidget: percentage >= 10
                   ? _buildCategoryBadge(entry.key, percentage)
                   : null,
-              badgePositionPercentageOffset: 1.1,
+              badgePositionPercentageOffset: 1.4,
             );
           }).toList(),
           pieTouchData: PieTouchData(
