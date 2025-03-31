@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/services/language_service.dart';
-import 'package:personal_finance/services/csv_service.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final Map<String, dynamic>? transaction; // Accepts transaction for editing
@@ -19,7 +18,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final LanguageService _languageService = LanguageService();
-  final CsvService _csvService = CsvService();
 
   late TextEditingController _amountController;
   late TextEditingController _descriptionController;
@@ -27,11 +25,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   String? _category;
   int? _walletId;
   DateTime _selectedDate = DateTime.now();
-  
+
   // Lists to hold data from the database
   List<Map<String, dynamic>> _incomeCategories = [];
   List<Map<String, dynamic>> _expenseCategories = [];
-  List<Map<String, dynamic>> _currentCategories = []; // Categories for the current type
+  List<Map<String, dynamic>> _currentCategories =
+      []; // Categories for the current type
   List<Map<String, dynamic>> _wallets = []; // Available wallets
 
   @override
@@ -56,43 +55,44 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _selectedDate = DateTime.parse(widget.transaction!['date']);
     }
   }
-  
+
   Future<void> _loadCategories() async {
     // Load income categories
     _incomeCategories = await _dbHelper.getCategories('income');
-    
+
     // Load expense categories
     _expenseCategories = await _dbHelper.getCategories('expense');
-    
+
     // Set current categories based on the selected type
     _updateCurrentCategories();
-    
+
     // Set default category if needed
     if (_category == null && _currentCategories.isNotEmpty) {
       _category = _currentCategories.first['name'];
     }
-    
+
     if (mounted) {
       setState(() {});
     }
   }
-  
+
   Future<void> _loadWallets() async {
     // Load wallets
     _wallets = await _dbHelper.getAllWallets();
-    
+
     // Set default wallet if needed
     if (_walletId == null && _wallets.isNotEmpty) {
       _walletId = _wallets.first['id'] as int;
     }
-    
+
     if (mounted) {
       setState(() {});
     }
   }
-  
+
   void _updateCurrentCategories() {
-    _currentCategories = _type == 'income' ? _incomeCategories : _expenseCategories;
+    _currentCategories =
+        _type == 'income' ? _incomeCategories : _expenseCategories;
   }
 
   @override
@@ -108,18 +108,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         'amount': double.parse(_amountController.text),
         'description': _descriptionController.text.trim(),
         'type': _type,
-        'category': _category ?? (_currentCategories.isNotEmpty ? _currentCategories.first['name'] : 'Others'),
+        'category': _category ??
+            (_currentCategories.isNotEmpty
+                ? _currentCategories.first['name']
+                : 'Others'),
         'wallet_id': _walletId,
-        'date': _selectedDate.toIso8601String().split('T')[0], // Только дата без времени
+        'date': _selectedDate
+            .toIso8601String()
+            .split('T')[0], // Только дата без времени
       };
 
       try {
         if (widget.transaction == null) {
           // Insert new transaction
           await _dbHelper.insertTransaction(transactionData);
-          
-          // Save to CSV file
-          await _csvService.addTransactionToCsv(transactionData);
         } else {
           // Update existing transaction
           await _dbHelper.updateTransaction(
@@ -142,7 +144,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Future<void> _selectDate(BuildContext context) async {
     String langCode = await _languageService.getCurrentLanguage();
-    
+
     // Map language codes to Flutter's MaterialLocalizations
     Locale locale;
     switch (langCode) {
@@ -157,7 +159,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       default:
         locale = const Locale('en', 'US');
     }
-    
+
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
@@ -168,7 +170,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       cancelText: _languageService.translate('cancel'),
       confirmText: _languageService.translate('save'),
     );
-    
+
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
@@ -181,7 +183,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.transaction != null 
+          widget.transaction != null
               ? _languageService.translate('editTransaction')
               : _languageService.translate('addTransaction'),
           style: const TextStyle(
@@ -236,8 +238,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               TextFormField(
                 controller: _descriptionController,
                 decoration: InputDecoration(
-                  labelText: '${_languageService.translate('description')} (${_languageService.translate('optional')})',
-                  prefixIcon: const Icon(Icons.description, color: Colors.blueAccent),
+                  labelText:
+                      '${_languageService.translate('description')} (${_languageService.translate('optional')})',
+                  prefixIcon:
+                      const Icon(Icons.description, color: Colors.blueAccent),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
@@ -260,7 +264,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         backgroundColor: WidgetStateProperty.resolveWith<Color>(
                           (Set<WidgetState> states) {
                             if (states.contains(WidgetState.selected)) {
-                              return _type == 'income' ? Colors.green.shade100 : Colors.red.shade100;
+                              return _type == 'income'
+                                  ? Colors.green.shade100
+                                  : Colors.red.shade100;
                             }
                             return Colors.transparent;
                           },
@@ -268,7 +274,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         foregroundColor: WidgetStateProperty.resolveWith<Color>(
                           (Set<WidgetState> states) {
                             if (states.contains(WidgetState.selected)) {
-                              return _type == 'income' ? Colors.green.shade800 : Colors.red.shade800;
+                              return _type == 'income'
+                                  ? Colors.green.shade800
+                                  : Colors.red.shade800;
                             }
                             return Colors.grey.shade700;
                           },
@@ -293,7 +301,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             _type = newSelection.first;
                             _updateCurrentCategories();
                             // Reset category when changing type
-                            _category = _currentCategories.isNotEmpty ? _currentCategories.first['name'] : null;
+                            _category = _currentCategories.isNotEmpty
+                                ? _currentCategories.first['name']
+                                : null;
                           });
                         }
                       },
@@ -308,7 +318,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 value: _category,
                 decoration: InputDecoration(
                   labelText: _languageService.translate('category'),
-                  prefixIcon: const Icon(Icons.category, color: Colors.blueAccent),
+                  prefixIcon:
+                      const Icon(Icons.category, color: Colors.blueAccent),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
@@ -334,13 +345,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 },
               ),
               const SizedBox(height: 20),
-              
+
               // Wallet Dropdown
               DropdownButtonFormField<int>(
                 value: _walletId,
                 decoration: InputDecoration(
                   labelText: _languageService.translate('wallet'),
-                  prefixIcon: const Icon(Icons.account_balance_wallet, color: Colors.blueAccent),
+                  prefixIcon: const Icon(Icons.account_balance_wallet,
+                      color: Colors.blueAccent),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
                   ),
@@ -377,7 +389,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   _selectedDate.toLocal().toString().split(' ')[0],
                   style: const TextStyle(fontSize: 16),
                 ),
-                trailing: const Icon(Icons.calendar_today, color: Colors.blueAccent),
+                trailing:
+                    const Icon(Icons.calendar_today, color: Colors.blueAccent),
                 onTap: () => _selectDate(context),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10.0),
