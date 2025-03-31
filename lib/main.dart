@@ -8,6 +8,7 @@ import 'package:personal_finance/pages/LogingRegister.dart';
 import 'package:personal_finance/services/language_service.dart';
 import 'package:personal_finance/services/theme_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +30,18 @@ void main() async {
     print("Error initializing: $e");
   }
   
-  runApp(const MyApp());
+  runApp(
+    // Provide services to the entire app
+    MultiProvider(
+      providers: [
+        Provider<LanguageService>(
+          create: (_) => languageService,
+        ),
+        // Add other providers as needed
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -37,8 +49,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final languageService = LanguageService();
     final themeService = ThemeService();
+    // Get language service from provider
+    final languageService = Provider.of<LanguageService>(context, listen: false);
 
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeService.themeController,
@@ -191,12 +204,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Widget
     const SettingsScreen(key: ValueKey('SettingsScreen')),
   ];
 
-  final LanguageService _languageService = LanguageService();
+  late LanguageService _languageService;
   
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this); // Add lifecycle observer
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _languageService = Provider.of<LanguageService>(context, listen: false);
   }
   
   @override
@@ -432,6 +451,8 @@ class _AuthCheckScreenState extends State<AuthCheckScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final languageService = Provider.of<LanguageService>(context, listen: false);
+    
     return Scaffold(
       body: Center(
         child: Column(
@@ -442,7 +463,7 @@ class _AuthCheckScreenState extends State<AuthCheckScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              LanguageService().translate('loading'),
+              languageService.translate('loading'),
               style: const TextStyle(fontSize: 16),
             ),
           ],

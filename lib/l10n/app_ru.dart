@@ -123,4 +123,32 @@ Map<String, String> get ru => {
   'card': 'Карта',
   'noWallets': 'Кошельки еще не добавлены',
   'dragToTransfer': 'Перетащите для перевода',
+  
+  // Added translations
+  'guest': 'Гость',
+  'account': 'Аккаунт',
+  'noTransactions': 'Нет транзакций',
+  'optional': 'Необязательно',
+  'searchTransactions': 'Поиск транзакций',
+  'filters': 'Фильтры',
+  'all': 'Все',
+  
+  // Report screen translations
+  'financialReport': 'Финансовый отчет',
+  'selectDateRange': 'Выбрать диапазон дат',
+  'noDataForSelectedPeriod': 'Нет данных за выбранный период',
+  'noTransactionData': 'Нет данных о транзакциях за выбранный период',
+  'noDataAvailable': 'Данные недоступны',
+  'totalIncome': 'Общий доход',
+  'totalExpenses': 'Общие расходы',
+  'categoryPercentage': 'Процент категории',
+  'dailyIncome': 'Ежедневный доход',
+  'dailyExpense': 'Ежедневные расходы',
+  'recentTransactions': 'Недавние транзакции',
+  'noDescription': 'Нет описания',
+  'whatWouldYouLikeToDo': 'Что бы вы хотели сделать?',
+  'edit': 'Редактировать',
+  'deleteTransaction': 'Удалить транзакцию',
+  'confirmDeleteTransaction': 'Вы уверены, что хотите удалить эту транзакцию?',
+  'selectDate': 'Выбрать дату',
 }; 

@@ -4,6 +4,7 @@ import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/utils/currency_utils.dart';
 import 'package:personal_finance/services/language_service.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -14,31 +15,38 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  final LanguageService _languageService = LanguageService();
+  late LanguageService _languageService;
   late Future<Map<String, dynamic>> _reportsFuture;
   ChartType _chartType = ChartType.pie;
   String selectedType = 'expense';
   String _currencySymbol = '₹';
+  String _currentLang = 'en';
+
   DateTime? selectedStartDate;
   DateTime? selectedEndDate;
 
   @override
   void initState() {
     super.initState();
+    // Initialize without provider
     _loadCurrency();
-
+    
     // Set default date range
-    final now = DateTime.now();
-    selectedStartDate = DateTime(now.year, now.month, 1); // Start of month
-    selectedEndDate = DateTime(now.year, now.month + 1, 0); // End of month
-
+    final DateTime now = DateTime.now();
+    final DateTime startOfMonth = DateTime(now.year, now.month, 1);
+    selectedStartDate = startOfMonth;
+    selectedEndDate = now;
+    
+    // Initialize reports future
     _reportsFuture = _loadData();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _loadCurrency();
+    // Access provider here which is safe after widget is inserted into tree
+    _languageService = Provider.of<LanguageService>(context, listen: false);
+    _loadCurrentLanguage();
   }
 
   Future<void> _loadCurrency() async {
@@ -174,7 +182,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Financial Report',
+          _languageService.translate('financialReport'),
           style: const TextStyle(
             color: Colors.white,
             fontSize: 22,
@@ -220,7 +228,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '${DateFormat('MMM d, y').format(selectedStartDate ?? DateTime.now())} - ${DateFormat('MMM d, y').format(selectedEndDate ?? DateTime.now())}',
+                        '${formatDate(selectedStartDate ?? DateTime.now())} - ${formatDate(selectedEndDate ?? DateTime.now())}',
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
                           color: Theme.of(context).colorScheme.onSurface,
@@ -253,6 +261,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               child: child!,
                             );
                           },
+                          helpText: _languageService.translate('selectDateRange'),
+                          cancelText: _languageService.translate('cancel'),
+                          confirmText: _languageService.translate('apply'),
+                          saveText: _languageService.translate('apply'),
+                          fieldStartHintText: _languageService.translate('from'),
+                          fieldEndHintText: _languageService.translate('to'),
                         );
                         if (dateRange != null) {
                           print('Date range selected: ${dateRange.start} to ${dateRange.end}');
@@ -289,7 +303,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   if (!snapshot.hasData || snapshot.hasError) {
                     return Center(
                       child: Text(
-                        'No data available',
+                        _languageService.translate('noDataAvailable'),
                         style: TextStyle(
                           color: Theme.of(context)
                               .colorScheme
@@ -419,7 +433,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   });
                                 },
                                 child: Text(
-                                  'Income',
+                                  _languageService.translate('income'),
                                   style: TextStyle(
                                     color: selectedType == 'income'
                                         ? Theme.of(context)
@@ -454,7 +468,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   });
                                 },
                                 child: Text(
-                                  'Expenses',
+                                  _languageService.translate('expenses'),
                                   style: TextStyle(
                                     color: selectedType == 'expense'
                                         ? Theme.of(context)
@@ -479,7 +493,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         child: Row(
                           children: [
                             Text(
-                              'Categories',
+                              _languageService.translate('categories'),
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -488,7 +502,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             ),
                             const Spacer(),
                             Text(
-                              'Total: $_currencySymbol${total.toStringAsFixed(0)}',
+                              '${_languageService.translate('totalBalance')}: $_currencySymbol${total.toStringAsFixed(0)}',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -504,7 +518,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         child: categoryData.isEmpty
                             ? Center(
                                 child: Text(
-                                  'No $selectedType data for selected period',
+                                  _languageService.translate('noDataForSelectedPeriod'),
                                   style: TextStyle(
                                     color: Theme.of(context)
                                         .colorScheme
@@ -616,7 +630,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (categoryData.isEmpty) {
         return Center(
           child: Text(
-            'No $selectedType data for selected period',
+            _languageService.translate('noDataForSelectedPeriod'),
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
@@ -664,7 +678,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (dailyIncome.isEmpty && dailyExpense.isEmpty) {
         return Center(
           child: Text(
-            'No transaction data for selected period',
+            _languageService.translate('noDataForSelectedPeriod'),
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
@@ -892,7 +906,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (allDates.isEmpty) {
       return Center(
         child: Text(
-          _languageService.translate('noDataForSelectedPeriod') ?? 'No data for selected period',
+          _languageService.translate('noDataForSelectedPeriod'),
           style: TextStyle(fontSize: 16),
         ),
       );
@@ -929,8 +943,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
                         String formattedAmount = '$_currencySymbol${rod.toY.toStringAsFixed(0)}';
                         String date = allDates[group.x.toInt()];
-                        // Format date to be more readable
-                        String formattedDate = DateFormat('dd-MM').format(DateTime.parse(date));
+                        DateTime parsedDate = DateTime.parse(date);
+                        // Format date to be more readable using localized format
+                        String formattedDate = formatShortDate(parsedDate);
                         return BarTooltipItem(
                           '$formattedDate\n$formattedAmount',
                           TextStyle(
@@ -954,8 +969,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             int interval = (allDates.length / 5).ceil();
                             if (value.toInt() % interval == 0 || value.toInt() == allDates.length - 1) {
                               final date = allDates[value.toInt()];
-                              // Format date to be more readable
-                              String formattedDate = DateFormat('dd-MM').format(DateTime.parse(date));
+                              DateTime parsedDate = DateTime.parse(date);
+                              // Format date using localized format
+                              String formattedDate = formatShortDate(parsedDate);
                               return Padding(
                                 padding: const EdgeInsets.only(top: 8.0),
                                 child: Text(
@@ -1028,7 +1044,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ),
                 SizedBox(width: 4),
                 Text(
-                  selectedType == 'income' ? 'Daily Income' : 'Daily Expense',
+                  selectedType == 'income' 
+                      ? _languageService.translate('dailyIncome') 
+                      : _languageService.translate('dailyExpense'),
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
@@ -1082,6 +1100,58 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ],
       );
     });
+  }
+
+  // Helper method to format dates according to current language
+  String formatDate(DateTime date) {
+    // Create locale-specific date formats based on current language
+    switch (_currentLang) {
+      case 'ru':
+        return DateFormat('d MMM y', 'ru').format(date);
+      case 'ky':
+        // Kyrgyz uses similar format to Russian
+        return DateFormat('d MMM y', 'ru').format(date);
+      default:
+        return DateFormat('MMM d, y').format(date);
+    }
+  }
+  
+  // Update date format based on current language
+  Future<void> updateLocalizedDateFormat() async {
+    try {
+      final lang = await _languageService.getCurrentLanguage();
+      if (mounted) {
+        setState(() {
+          _currentLang = lang;
+        });
+      }
+    } catch (e) {
+      print('Error loading language for date formatting: $e');
+    }
+  }
+
+  Future<void> _loadCurrentLanguage() async {
+    try {
+      final lang = await _languageService.getCurrentLanguage();
+      if (mounted) {
+        setState(() {
+          _currentLang = lang;
+        });
+      }
+    } catch (e) {
+      print('Error loading language: $e');
+    }
+  }
+
+  // Helper method to format chart dates according to current language (short format)
+  String formatShortDate(DateTime date) {
+    switch (_currentLang) {
+      case 'ru':
+      case 'ky':
+        return DateFormat('dd.MM', 'ru').format(date);
+      default:
+        return DateFormat('MM-dd').format(date);
+    }
   }
 }
 
