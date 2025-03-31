@@ -387,13 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.red,
                       icon: Icons.arrow_downward,
                     ),
-                    const SizedBox(height: 8),
-                    SummaryCard(
-                      title: _languageService.translate('balance'),
-                      amount: '$_currencySymbol${_balance.toStringAsFixed(2)}',
-                      color: Colors.blue,
-                      icon: Icons.account_balance_wallet,
-                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -405,27 +399,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Balance Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _languageService.translate('wallets'),
+                          _languageService.translate('balance'),
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
+                            color: Colors.black,
                           ),
                         ),
                         Text(
-                          _languageService.translate('dragToTransfer'),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
-                            fontStyle: FontStyle.italic,
+                          '$_currencySymbol${_balance.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 16),
                     // Using Wrap instead of SingleChildScrollView
                     FutureBuilder<List<Map<String, dynamic>>>(
                       future: _walletsFuture,
@@ -467,8 +463,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         
                         final wallets = snapshot.data!;
                         return Wrap(
-                          spacing: 8.0, // horizontal spacing between cards
-                          runSpacing: 8.0, // vertical spacing between lines
+                          spacing: 8.0,
+                          runSpacing: 8.0,
                           children: wallets.map((wallet) {
                             return _buildDraggableWalletCard(wallet, wallets);
                           }).toList(),
@@ -503,16 +499,62 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
+  // Build a wallet card
+  Widget _buildWalletCard(Map<String, dynamic> wallet, {bool isTargeted = false}) {
+    final balance = wallet['balance'] as double;
+    final double cardSize = 85.0; // Even smaller for better grid layout
+    
+    return Card(
+      elevation: isTargeted ? 8 : 2,
+      margin: const EdgeInsets.all(4),
+      shape: const CircleBorder(),
+      child: Container(
+        width: cardSize,
+        height: cardSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: isTargeted ? Border.all(
+            color: Colors.deepPurple,
+            width: 2,
+          ) : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              wallet['name'] as String,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey,
+              ),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${_currencySymbol}${balance.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Build a draggable wallet card
   Widget _buildDraggableWalletCard(Map<String, dynamic> wallet, List<Map<String, dynamic>> allWallets) {
     final balance = wallet['balance'] as double;
-    final double cardSize = 90.0; // Smaller fixed size for circular card
+    final double cardSize = 85.0; // Even smaller for better grid layout
     
     return LongPressDraggable<Map<String, dynamic>>(
       data: wallet,
       delay: const Duration(milliseconds: 0),
       dragAnchorStrategy: (draggable, context, position) {
-        // Return the center of the draggable
         return Offset(cardSize / 2, cardSize / 2);
       },
       feedback: Material(
@@ -536,30 +578,24 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  wallet['name'] as String,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
+              Text(
+                wallet['name'] as String,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey,
                 ),
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 2),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  '$_currencySymbol${balance.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: balance >= 0 ? Colors.green : Colors.red,
-                  ),
-                  textAlign: TextAlign.center,
+              const SizedBox(height: 4),
+              Text(
+                '${_currencySymbol}${balance.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -579,59 +615,6 @@ class _HomeScreenState extends State<HomeScreen> {
             isTargeted: candidateData.isNotEmpty
           );
         },
-      ),
-    );
-  }
-  
-  // Build a wallet card
-  Widget _buildWalletCard(Map<String, dynamic> wallet, {bool isTargeted = false}) {
-    final balance = wallet['balance'] as double;
-    final double cardSize = 90.0; // Smaller fixed size for circular card
-    
-    return Card(
-      elevation: isTargeted ? 8 : 2,
-      margin: const EdgeInsets.all(4),
-      shape: const CircleBorder(),
-      child: Container(
-        width: cardSize,
-        height: cardSize,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: isTargeted ? Border.all(
-            color: Colors.deepPurple,
-            width: 2,
-          ) : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Text(
-                wallet['name'] as String,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                '$_currencySymbol${balance.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: balance >= 0 ? Colors.green : Colors.red,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
