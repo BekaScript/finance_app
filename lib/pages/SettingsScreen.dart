@@ -3,7 +3,11 @@ import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/services/language_service.dart';
 import 'package:personal_finance/services/theme_service.dart';
 import 'package:personal_finance/pages/LogingRegister.dart';
-
+import 'package:personal_finance/services/csv_service.dart';
+import 'dart:io';
+import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
+import 'package:cross_file/cross_file.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -16,6 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final LanguageService _languageService = LanguageService();
   final ThemeService _themeService = ThemeService();
+  final CsvService _csvService = CsvService();
   bool _isDarkMode = false;
   String _selectedCurrency = 'USD';
   String _selectedLanguage = 'en';
@@ -99,7 +104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark 
+          color: Theme.of(context).brightness == Brightness.dark
               ? Colors.black.withAlpha(179)
               : Colors.white.withAlpha(179),
         ),
@@ -113,8 +118,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 child: SwitchListTile.adaptive(
-                  title: Text(_languageService.translate('darkMode'), style: const TextStyle(fontSize: 16)),
-                  subtitle: Text(_isDarkMode ? _languageService.translate('enabled') : _languageService.translate('disabled')),
+                  title: Text(_languageService.translate('darkMode'),
+                      style: const TextStyle(fontSize: 16)),
+                  subtitle: Text(_isDarkMode
+                      ? _languageService.translate('enabled')
+                      : _languageService.translate('disabled')),
                   value: _isDarkMode,
                   onChanged: (value) => _toggleTheme(),
                   secondary:
@@ -146,7 +154,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(_languageService.translate('languageUpdated')),
+                              content: Text(_languageService
+                                  .translate('languageUpdated')),
                               duration: const Duration(seconds: 2),
                             ),
                           );
@@ -170,15 +179,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Reset Data Button
               Card(
                 elevation: 2,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)
-                ),
+                    borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
                   leading: const Icon(Icons.restore, color: Colors.orange),
                   title: Text(
@@ -192,12 +200,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _languageService.translate('resetDataDescription'),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.color
+                          ?.withOpacity(0.6),
                     ),
                   ),
                   onTap: _showResetConfirmation,
                 ),
               ),
+
+              // CSV Export Button
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  leading: const Icon(Icons.file_download, color: Colors.green),
+                  title: Text(
+                    _languageService.translate('exportData'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _languageService.translate('exportDataDescription'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.color
+                          ?.withOpacity(0.6),
+                    ),
+                  ),
+                  onTap: _showExportOptionsDialog,
+                ),
+              ),
+
+              const SizedBox(height: 16),
 
               // Login/Register button
               ListTile(
@@ -243,7 +286,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
               onChanged: (String? value) {
                 if (value != null) {
@@ -273,7 +317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _getCurrencyIcon(String currency) {
     IconData iconData;
     Color iconColor;
-    
+
     switch (currency) {
       case 'USD':
         iconData = Icons.attach_money;
@@ -295,18 +339,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         iconData = Icons.money;
         iconColor = Colors.grey;
     }
-    
+
     return Icon(iconData, color: iconColor);
   }
 
   // Show exchange rate dialog when selecting currency
   Future<void> _showExchangeRateDialog(String currency) async {
     if (currency == _selectedCurrency) return;
-    
+
     // Get current exchange rate for this currency
     double currentRate = await _dbHelper.getExchangeRate(currency);
     final rateController = TextEditingController(text: currentRate.toString());
-    
+
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -319,7 +363,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: rateController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: _languageService.translate('exchangeRate'),
                 border: const OutlineInputBorder(),
@@ -408,7 +453,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       },
     );
   }
-  
+
   // Reset data
   Future<void> _resetData() async {
     try {
@@ -419,7 +464,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             content: Row(
               children: [
                 const SizedBox(
-                  height: 20, width: 20,
+                  height: 20,
+                  width: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     color: Colors.white,
@@ -433,10 +479,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       }
-      
+
       // Call the database helper reset method
       final success = await _dbHelper.resetTransactionData();
-      
+
       if (mounted) {
         if (success) {
           // Show success message
@@ -492,14 +538,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (success) {
                   if (mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => const Loginregister()),
+                      MaterialPageRoute(
+                          builder: (context) => const Loginregister()),
                       (Route<dynamic> route) => false,
                     );
                   }
                 } else {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(_languageService.translate('logoutFailed'))),
+                      SnackBar(
+                          content:
+                              Text(_languageService.translate('logoutFailed'))),
                     );
                   }
                 }
@@ -511,5 +560,266 @@ class _SettingsScreenState extends State<SettingsScreen> {
       },
     );
   }
-}
 
+  // Show export options dialog
+  Future<void> _showExportOptionsDialog() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(_languageService.translate('exportData')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.calendar_month),
+                title:
+                    Text(_languageService.translate('exportForCurrentMonth')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _exportCurrentMonth();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.date_range),
+                title: Text(_languageService.translate('exportForCustomRange')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDateRangeDialog();
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_languageService.translate('cancel')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Export for current month
+  Future<void> _exportCurrentMonth() async {
+    final now = DateTime.now();
+    final firstDayOfMonth = DateTime(now.year, now.month, 1);
+    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
+
+    await _exportData(firstDayOfMonth, lastDayOfMonth);
+  }
+
+  // Show dialog to select custom date range
+  Future<void> _showDateRangeDialog() async {
+    final now = DateTime.now();
+    DateTime startDate = DateTime(now.year, now.month, 1);
+    DateTime endDate = DateTime(now.year, now.month, now.day);
+
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(_languageService.translate('selectDateRange')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      title:
+                          Text(_languageService.translate('selectStartDate')),
+                      subtitle:
+                          Text(DateFormat('MMM dd, yyyy').format(startDate)),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: startDate,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now(),
+                        );
+                        if (pickedDate != null) {
+                          setState(() {
+                            startDate = pickedDate;
+                            // Ensure end date is not before start date
+                            if (endDate.isBefore(startDate)) {
+                              endDate = startDate;
+                            }
+                          });
+                        }
+                      },
+                    ),
+                    ListTile(
+                      title: Text(_languageService.translate('selectEndDate')),
+                      subtitle:
+                          Text(DateFormat('MMM dd, yyyy').format(endDate)),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: endDate,
+                          firstDate: startDate,
+                          lastDate: DateTime.now(),
+                        );
+                        if (pickedDate != null) {
+                          setState(() {
+                            endDate = pickedDate;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(_languageService.translate('cancel')),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _exportData(startDate, endDate);
+                  },
+                  child: Text(_languageService.translate('exportToCsv')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Export data for the selected date range
+  Future<void> _exportData(DateTime startDate, DateTime endDate) async {
+    try {
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(_languageService.translate('exporting')),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Get currency
+      final currency = await _dbHelper.getCurrency();
+
+      // Export data
+      final filePath = await _csvService.exportTransactionHistory(
+        startDate,
+        endDate,
+        currency,
+      );
+
+      if (filePath.isNotEmpty) {
+        _showExportSuccessDialog(filePath);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_languageService.translate('exportError')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error exporting data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_languageService.translate('exportError')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Show export success dialog
+  Future<void> _showExportSuccessDialog(String filePath) async {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(_languageService.translate('exportComplete')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_languageService.translate('exportSuccess')),
+              const SizedBox(height: 8),
+              Text(
+                '${_languageService.translate('fileSaved')}\n$filePath',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_languageService.translate('cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _shareFile(filePath);
+              },
+              child: Text(_languageService.translate('shareFile')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Share the exported file
+  Future<void> _shareFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        await Share.shareXFiles([XFile(filePath)],
+            text: _languageService.translate('transactionHistory'));
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_languageService.translate('exportError')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error sharing file: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+}

@@ -125,32 +125,4 @@ Map<String, String> get en => {
   'card': 'Card',
   'noWallets': 'No wallets added yet',
   'dragToTransfer': 'Drag to transfer',
-  
-  // Added translations
-  'guest': 'Guest',
-  'account': 'Account',
-  'noTransactions': 'No transactions',
-  'optional': 'Optional',
-  'searchTransactions': 'Search transactions',
-  'filters': 'Filters',
-  'all': 'All',
-  
-  // Report screen translations
-  'financialReport': 'Financial Report',
-  'selectDateRange': 'Select Date Range',
-  'noDataForSelectedPeriod': 'No data for selected period',
-  'noTransactionData': 'No transaction data for selected period',
-  'noDataAvailable': 'No data available',
-  'totalIncome': 'Total Income',
-  'totalExpenses': 'Total Expenses',
-  'categoryPercentage': 'Category %',
-  'dailyIncome': 'Daily Income',
-  'dailyExpense': 'Daily Expense',
-  'recentTransactions': 'Recent Transactions',
-  'noDescription': 'No description',
-  'whatWouldYouLikeToDo': 'What would you like to do?',
-  'edit': 'Edit',
-  'deleteTransaction': 'Delete Transaction',
-  'confirmDeleteTransaction': 'Are you sure you want to delete this transaction?',
-  'selectDate': 'Select Date',
 }; 
