@@ -2,8 +2,9 @@ import '../l10n/app_en.dart';
 import '../l10n/app_ru.dart';
 import '../l10n/app_ky.dart';
 import '../database/database_helper.dart';
+import 'package:flutter/foundation.dart';
 
-class LanguageService {
+class LanguageService extends ChangeNotifier {
   static final LanguageService _instance = LanguageService._internal();
   factory LanguageService() => _instance;
   
@@ -59,6 +60,7 @@ class LanguageService {
   Future<void> setLanguage(String languageCode) async {
     _currentLanguage = languageCode;
     await _dbHelper.setLanguage(languageCode);
+    notifyListeners();
   }
   
   Future<String> getCurrentLanguage() async {
@@ -72,5 +74,6 @@ class LanguageService {
 
   Future<void> initLanguage() async {
     _currentLanguage = await _dbHelper.getLanguage();
+    notifyListeners();
   }
 } 

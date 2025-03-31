@@ -6,6 +6,7 @@ import 'package:personal_finance/widgets/summary_card.dart';
 import '../utils/currency_utils.dart';
 import '../services/language_service.dart';
 import '../pages/CategoryScreen.dart';
+import 'package:provider/provider.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -29,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userEmail = '';
   String _currencySymbol = '\$';
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  final LanguageService _languageService = LanguageService();
+  late LanguageService _languageService;
   
   // For wallet transfers
   final TextEditingController _transferAmountController = TextEditingController();
@@ -50,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _languageService = Provider.of<LanguageService>(context, listen: false);
     _loadCurrency();
   }
 

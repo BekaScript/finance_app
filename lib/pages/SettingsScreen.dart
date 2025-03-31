@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:cross_file/cross_file.dart';
+import 'package:provider/provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,7 +19,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  final LanguageService _languageService = LanguageService();
+  late LanguageService _languageService;
   final ThemeService _themeService = ThemeService();
   final CsvService _csvService = CsvService();
   bool _isDarkMode = false;
@@ -30,6 +31,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _loadSettings();
     print('SettingsScreen initialized');
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _languageService = Provider.of<LanguageService>(context, listen: false);
   }
 
   Future<void> _loadSettings() async {

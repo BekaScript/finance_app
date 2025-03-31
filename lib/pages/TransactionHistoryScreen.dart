@@ -7,6 +7,8 @@ import '../services/csv_service.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:share_plus/share_plus.dart';
+import 'package:cross_file/cross_file.dart';
+import 'package:provider/provider.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -24,7 +26,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   List<Map<String, dynamic>> _transactions = [];
   String _searchQuery = "";
   String _filterType = "All";
-  final LanguageService _languageService = LanguageService();
+  late LanguageService _languageService;
 
   // Date range for exports
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
@@ -41,6 +43,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _languageService = Provider.of<LanguageService>(context, listen: false);
     _loadCurrency();
   }
 

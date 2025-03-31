@@ -31,13 +31,14 @@ void main() async {
   }
   
   runApp(
-    // Provide services to the entire app
     MultiProvider(
       providers: [
-        Provider<LanguageService>(
-          create: (_) => languageService,
+        ChangeNotifierProvider<LanguageService>.value(
+          value: languageService,
         ),
-        // Add other providers as needed
+        Provider<ThemeService>.value(
+          value: themeService,
+        ),
       ],
       child: const MyApp(),
     ),
@@ -49,9 +50,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeService = ThemeService();
-    // Get language service from provider
-    final languageService = Provider.of<LanguageService>(context, listen: false);
+    final themeService = Provider.of<ThemeService>(context, listen: false);
+    final languageService = Provider.of<LanguageService>(context);
 
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeService.themeController,
