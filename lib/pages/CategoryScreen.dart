@@ -140,7 +140,7 @@ class _CategoryScreenState extends State<CategoryScreen> with SingleTickerProvid
   
   void _showAddWalletDialog({Map<String, dynamic>? wallet}) {
     _editWallet = wallet;
-    bool _isSaving = false;
+    bool isSaving = false;
     
     if (wallet != null) {
       _walletNameController.text = wallet['name'];
@@ -169,9 +169,9 @@ class _CategoryScreenState extends State<CategoryScreen> with SingleTickerProvid
                     ),
                   ),
                   autofocus: true,
-                  enabled: !_isSaving,
+                  enabled: !isSaving,
                 ),
-                if (_isSaving) 
+                if (isSaving) 
                   Padding(
                     padding: const EdgeInsets.only(top: 16.0),
                     child: CircularProgressIndicator(),
@@ -180,7 +180,7 @@ class _CategoryScreenState extends State<CategoryScreen> with SingleTickerProvid
             ),
             actions: [
               TextButton(
-                onPressed: _isSaving 
+                onPressed: isSaving 
                   ? null 
                   : () {
                       Navigator.pop(context);
@@ -190,13 +190,13 @@ class _CategoryScreenState extends State<CategoryScreen> with SingleTickerProvid
                 child: Text(_languageService.translate('cancel')),
               ),
               TextButton(
-                onPressed: _isSaving 
+                onPressed: isSaving 
                   ? null 
                   : () async {
                     if (_walletNameController.text.isEmpty) return;
                     
                     setState(() {
-                      _isSaving = true;
+                      isSaving = true;
                     });
                     
                     try {
@@ -225,7 +225,7 @@ class _CategoryScreenState extends State<CategoryScreen> with SingleTickerProvid
                       print("Error saving wallet: $e");
                       if (mounted) {
                         setState(() {
-                          _isSaving = false;
+                          isSaving = false;
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text("Error saving wallet: $e"))
@@ -340,40 +340,53 @@ class _CategoryScreenState extends State<CategoryScreen> with SingleTickerProvid
       );
     }
     
-    return ListView.builder(
-      itemCount: _wallets.length,
-      itemBuilder: (context, index) {
-        final wallet = _wallets[index];
-        final balance = wallet['balance'] as double;
-        
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            title: Text(wallet['name']),
-            subtitle: Text(
-              '$_currencySymbol${balance.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: balance >= 0 ? Colors.green : Colors.red,
-              ),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () => _showAddWalletDialog(wallet: wallet),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _wallets.isEmpty
+            ? Expanded(
+                child: Center(
+                  child: Text(_languageService.translate('noWallets')),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _deleteWallet(wallet),
-                ),
-              ],
+              )
+            : Expanded(
+                child: ListView.builder(
+                   itemCount: _wallets.length,
+                   itemBuilder: (context, index) {
+                     final wallet = _wallets[index];
+                     final balance = wallet['balance'] as double;
+                     
+                     return Card(
+                       elevation: 2,
+                       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                       child: ListTile(
+                         title: Text(wallet['name']),
+                         subtitle: Text(
+                           '$_currencySymbol${balance.toStringAsFixed(2)}',
+                           style: TextStyle(
+                             fontWeight: FontWeight.bold,
+                             color: balance >= 0 ? Colors.green : Colors.red,
+                           ),
+                         ),
+                         trailing: Row(
+                           mainAxisSize: MainAxisSize.min,
+                           children: [
+                             IconButton(
+                               icon: const Icon(Icons.edit, color: Colors.blue),
+                               onPressed: () => _showAddWalletDialog(wallet: wallet),
+                             ),
+                             IconButton(
+                               icon: const Icon(Icons.delete, color: Colors.red),
+                               onPressed: () => _deleteWallet(wallet),
+                             ),
+                           ],
+                         ),
+                       ),
+                     );
+                   },
+                 ),
             ),
-          ),
-        );
-      },
+      ],
     );
   }
   

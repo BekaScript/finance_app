@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/services/language_service.dart';
+import 'package:personal_finance/services/csv_service.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final Map<String, dynamic>? transaction; // Accepts transaction for editing
@@ -18,6 +19,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final LanguageService _languageService = LanguageService();
+  final CsvService _csvService = CsvService();
 
   late TextEditingController _amountController;
   late TextEditingController _descriptionController;
@@ -108,22 +110,33 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         'type': _type,
         'category': _category ?? (_currentCategories.isNotEmpty ? _currentCategories.first['name'] : 'Others'),
         'wallet_id': _walletId,
-        'date': _selectedDate.toIso8601String(),
+        'date': _selectedDate.toIso8601String().split('T')[0], // Только дата без времени
       };
 
-      if (widget.transaction == null) {
-        // Insert new transaction
-        await _dbHelper.insertTransaction(transactionData);
-      } else {
-        // Update existing transaction
-        await _dbHelper.updateTransaction(
-          transactionData,
-          widget.transaction!['id'],
+      try {
+        if (widget.transaction == null) {
+          // Insert new transaction
+          await _dbHelper.insertTransaction(transactionData);
+          
+          // Save to CSV file
+          await _csvService.addTransactionToCsv(transactionData);
+        } else {
+          // Update existing transaction
+          await _dbHelper.updateTransaction(
+            transactionData,
+            widget.transaction!['id'],
+          );
+        }
+
+        // ignore: use_build_context_synchronously
+        Navigator.pop(context, true); // Return success
+      } catch (e) {
+        print('Error saving transaction: $e');
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
         );
       }
-
-      // ignore: use_build_context_synchronously
-      Navigator.pop(context, true); // Return success
     }
   }
 
@@ -223,7 +236,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               TextFormField(
                 controller: _descriptionController,
                 decoration: InputDecoration(
-                  labelText: _languageService.translate('description') + ' (' + _languageService.translate('optional') + ')',
+                  labelText: '${_languageService.translate('description')} (${_languageService.translate('optional')})',
                   prefixIcon: const Icon(Icons.description, color: Colors.blueAccent),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
@@ -244,17 +257,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     padding: const EdgeInsets.all(4.0),
                     child: SegmentedButton<String>(
                       style: ButtonStyle(
-                        backgroundColor: MaterialStateProperty.resolveWith<Color>(
-                          (Set<MaterialState> states) {
-                            if (states.contains(MaterialState.selected)) {
+                        backgroundColor: WidgetStateProperty.resolveWith<Color>(
+                          (Set<WidgetState> states) {
+                            if (states.contains(WidgetState.selected)) {
                               return _type == 'income' ? Colors.green.shade100 : Colors.red.shade100;
                             }
                             return Colors.transparent;
                           },
                         ),
-                        foregroundColor: MaterialStateProperty.resolveWith<Color>(
-                          (Set<MaterialState> states) {
-                            if (states.contains(MaterialState.selected)) {
+                        foregroundColor: WidgetStateProperty.resolveWith<Color>(
+                          (Set<WidgetState> states) {
+                            if (states.contains(WidgetState.selected)) {
                               return _type == 'income' ? Colors.green.shade800 : Colors.red.shade800;
                             }
                             return Colors.grey.shade700;

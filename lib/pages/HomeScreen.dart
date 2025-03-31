@@ -71,7 +71,19 @@ class _HomeScreenState extends State<HomeScreen> {
   // Fetch all wallets
   Future<List<Map<String, dynamic>>> _fetchWallets() async {
     try {
-      return await _dbHelper.getAllWallets();
+      // Получаем ID текущего пользователя
+      final userId = await _dbHelper.getCurrentUserId();
+      print("Загрузка кошельков для пользователя с ID: $userId");
+      
+      final wallets = await _dbHelper.getAllWallets();
+      print("Загружено ${wallets.length} кошельков");
+      
+      // Выводим информацию о каждом кошельке
+      for (var wallet in wallets) {
+        print("Кошелек ID: ${wallet['id']}, Имя: ${wallet['name']}, Пользователь: ${wallet['user_id']}");
+      }
+      
+      return wallets;
     } catch (e) {
       print("Error fetching wallets: $e");
       return [];
@@ -82,23 +94,40 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchSummaryData() async {
     try {
       final db = await dbHelper.database;
+      final int? userId = await _dbHelper.getCurrentUserId();
+      
+      String userFilter = '';
+      List<dynamic> whereArgs = [];
+      
+      if (userId != null) {
+        userFilter = 'AND user_id = ?';
+        whereArgs = [userId];
+        print("Запрашиваем статистику для пользователя с ID: $userId");
+      } else {
+        userFilter = 'AND user_id IS NULL';
+        print("Запрашиваем статистику в гостевом режиме");
+      }
 
       // Get total income
       final incomeResult = await db.rawQuery(
-          "SELECT SUM(amount) as total FROM transactions WHERE type = 'income'");
+          "SELECT SUM(amount) as total FROM transactions WHERE type = 'income' $userFilter", 
+          whereArgs);
       _totalIncome = incomeResult.first['total'] != null
           ? (incomeResult.first['total'] as num).toDouble()
           : 0.0;
 
       // Get total expenses
       final expenseResult = await db.rawQuery(
-          "SELECT SUM(amount) as total FROM transactions WHERE type = 'expense'");
+          "SELECT SUM(amount) as total FROM transactions WHERE type = 'expense' $userFilter", 
+          whereArgs);
       _totalExpenses = expenseResult.first['total'] != null
           ? (expenseResult.first['total'] as num).toDouble()
           : 0.0;
 
       // Calculate balance
       _balance = _totalIncome - _totalExpenses;
+      
+      print("Статистика: доход=$_totalIncome, расходы=$_totalExpenses, баланс=$_balance");
 
       setState(() {}); // Refresh UI
     } catch (e) {
@@ -109,8 +138,16 @@ class _HomeScreenState extends State<HomeScreen> {
   // Fetch all transactions
   Future<List<Map<String, dynamic>>> _fetchTransactions() async {
     try {
-      final db = await dbHelper.database;
-      return await db.query('transactions', orderBy: 'date DESC');
+      print("Запрашиваем транзакции для текущего пользователя");
+      final transactions = await _dbHelper.getTransactions();
+      print("Получено ${transactions.length} транзакций");
+      
+      // Дополнительное логирование для отладки
+      if (transactions.isNotEmpty) {
+        print("Первая транзакция: ${transactions.first}");
+      }
+      
+      return transactions;
     } catch (e) {
       print("Error fetching transactions: $e");
       return [];
@@ -320,66 +357,145 @@ class _HomeScreenState extends State<HomeScreen> {
               ? Colors.black.withAlpha(179) // 0.7 * 255 ≈ 179
               : Colors.white.withAlpha(179),
         ),
-        child: Column(
-          children: [
-            // Summary Cards
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  SummaryCard(
-                    title: _languageService.translate('income'),
-                    amount: '$_currencySymbol${_totalIncome.toStringAsFixed(2)}',
-                    color: Colors.green,
-                    icon: Icons.arrow_upward,
-                  ),
-                  const SizedBox(height: 12),
-                  SummaryCard(
-                    title: _languageService.translate('expenses'),
-                    amount: '$_currencySymbol${_totalExpenses.toStringAsFixed(2)}',
-                    color: Colors.red,
-                    icon: Icons.arrow_downward,
-                  ),
-                  const SizedBox(height: 12),
-                  SummaryCard(
-                    title: _languageService.translate('balance'),
-                    amount: '$_currencySymbol${_balance.toStringAsFixed(2)}',
-                    color: Colors.blue,
-                    icon: Icons.account_balance_wallet,
-                  ),
-                ],
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Summary Cards - использую ListView вместо Column, чтобы обеспечить скроллинг при необходимости
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 0.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SummaryCard(
+                      title: _languageService.translate('income'),
+                      amount: '$_currencySymbol${_totalIncome.toStringAsFixed(2)}',
+                      color: Colors.green,
+                      icon: Icons.arrow_upward,
+                    ),
+                    const SizedBox(height: 8),
+                    SummaryCard(
+                      title: _languageService.translate('expenses'),
+                      amount: '$_currencySymbol${_totalExpenses.toStringAsFixed(2)}',
+                      color: Colors.red,
+                      icon: Icons.arrow_downward,
+                    ),
+                    const SizedBox(height: 8),
+                    SummaryCard(
+                      title: _languageService.translate('balance'),
+                      amount: '$_currencySymbol${_balance.toStringAsFixed(2)}',
+                      color: Colors.blue,
+                      icon: Icons.account_balance_wallet,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            
-            // Wallet Cards with Drag & Drop
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _languageService.translate('wallets'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+              
+              // Wallet Cards with Drag & Drop
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _languageService.translate('wallets'),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _languageService.translate('dragToTransfer'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
-                          fontStyle: FontStyle.italic,
+                        Text(
+                          _languageService.translate('dragToTransfer'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Использую LimitedBox для ограничения высоты секции кошельков
+                    LimitedBox(
+                      maxHeight: 150, // Ограничиваем высоту
+                      child: FutureBuilder<List<Map<String, dynamic>>>(
+                        future: _walletsFuture,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          } else if (snapshot.hasError) {
+                            return Center(child: Text('Error: ${snapshot.error}'));
+                          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(_languageService.translate('noWallets')),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _showAddWalletDialog(),
+                                    icon: const Icon(Icons.add),
+                                    label: Text(
+                                      _languageService.translate('addWallet'),
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.deepPurple,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            );
+                          }
+                          
+                          final wallets = snapshot.data!;
+                          // Логируем wallet ID и user_id для отладки
+                          for (var wallet in wallets) {
+                            print("Отображаем кошелек: ID=${wallet['id']}, Name=${wallet['name']}, UserId=${wallet['user_id']}");
+                          }
+                                        
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: wallets.map((wallet) {
+                                    return _buildDraggableWalletCard(wallet, wallets);
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  FutureBuilder<List<Map<String, dynamic>>>(
-                    future: _walletsFuture,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Recent Transactions
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    setState(() {
+                      _loadData(); // Refresh data
+                    });
+                  },
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _transactionsFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
@@ -387,77 +503,44 @@ class _HomeScreenState extends State<HomeScreen> {
                         return Center(child: Text('Error: ${snapshot.error}'));
                       } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                         return Center(
-                          child: Text(_languageService.translate('noWallets'))
+                          child: Text(_languageService.translate('noTransactions'))
                         );
                       }
-                      
-                      final wallets = snapshot.data!;
-                      return Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: wallets.map((wallet) {
-                          final balance = wallet['balance'] as double;
-                          
-                          return _buildDraggableWalletCard(wallet, wallets);
-                        }).toList(),
+
+                      final transactions = snapshot.data!;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                            child: Text(
+                              _languageService.translate('recentTransactions'),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.only(bottom: 80), // Дополнительный отступ внизу
+                              itemCount: transactions.length,
+                              itemBuilder: (context, index) {
+                                final transaction = transactions[index];
+                                return _buildTransactionTile(transaction);
+                              },
+                            ),
+                          ),
+                        ],
                       );
                     },
                   ),
-                ],
-              ),
-            ),
-
-            // Recent Transactions
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  setState(() {
-                    _loadData(); // Refresh data
-                  });
-                },
-                child: FutureBuilder<List<Map<String, dynamic>>>(
-                  future: _transactionsFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return Center(
-                        child: Text(_languageService.translate('noTransactions'))
-                      );
-                    }
-
-                    final transactions = snapshot.data!;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                          child: Text(
-                            _languageService.translate('recentTransactions'),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: transactions.length,
-                            itemBuilder: (context, index) {
-                              final transaction = transactions[index];
-                              return _buildTransactionTile(transaction);
-                            },
-                          ),
-                        ),
-                      ],
-                    );
-                  },
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
 
@@ -527,10 +610,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _buildWalletCard(wallet),
       ),
       child: DragTarget<Map<String, dynamic>>(
-        onWillAccept: (data) => data != null && data['id'] != wallet['id'],
-        onAccept: (sourceWallet) {
+        onWillAcceptWithDetails: (data) => data.data['id'] != wallet['id'],
+        onAcceptWithDetails: (details) {
           // Show transfer dialog when a wallet is dropped onto this one
-          _showTransferDialog(sourceWallet, wallet);
+          _showTransferDialog(details.data, wallet);
         },
         builder: (context, candidateData, rejectedData) {
           return _buildWalletCard(wallet, 
@@ -819,6 +902,127 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showAddWalletDialog() {
+    final walletNameController = TextEditingController();
+    final balanceController = TextEditingController(text: "0");
+    final walletTypes = ['Cash', 'Card'];
+    String selectedType = 'Cash';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(_languageService.translate('addWallet')),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: walletNameController,
+                    decoration: InputDecoration(
+                      labelText: _languageService.translate('walletName'),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: balanceController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: _languageService.translate('initialBalance'),
+                      border: const OutlineInputBorder(),
+                      prefixText: _currencySymbol,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: selectedType,
+                    decoration: InputDecoration(
+                      labelText: _languageService.translate('walletType'),
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: walletTypes.map((type) {
+                      return DropdownMenuItem<String>(
+                        value: type,
+                        child: Text(_languageService.translate(type.toLowerCase())),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          selectedType = value;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(_languageService.translate('cancel')),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    // Validate inputs
+                    if (walletNameController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(_languageService.translate('enterWalletName')))
+                      );
+                      return;
+                    }
+
+                    // Parse balance with fallback to 0.0
+                    double balance = 0.0;
+                    try {
+                      balance = double.parse(balanceController.text);
+                    } catch (e) {
+                      print("Couldn't parse balance: $e, using default 0.0");
+                    }
+
+                    // Create wallet with explicit values for all fields
+                    final wallet = {
+                      'name': walletNameController.text,
+                      'balance': balance,
+                      'type': selectedType,
+                    };
+
+                    try {
+                      print("Attempting to insert wallet: $wallet");
+                      final result = await _dbHelper.insertWallet(wallet);
+                      print("Insert result: $result");
+                      
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(_languageService.translate('walletCreated')))
+                        );
+
+                        // Refresh wallets
+                        setState(() {
+                          _loadData();
+                        });
+                      }
+                    } catch (e) {
+                      print("Error creating wallet: $e");
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e'))
+                        );
+                      }
+                    }
+                  },
+                  child: Text(_languageService.translate('add')),
+                ),
+              ],
+            );
+          }
+        );
+      },
     );
   }
 }

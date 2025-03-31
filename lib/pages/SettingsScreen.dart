@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/services/language_service.dart';
 import 'package:personal_finance/services/theme_service.dart';
+import 'package:personal_finance/pages/LogingRegister.dart';
 
 
 class SettingsScreen extends StatefulWidget {
@@ -196,6 +197,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   onTap: _showResetConfirmation,
                 ),
+              ),
+
+              // Login/Register button
+              ListTile(
+                leading: const Icon(Icons.login),
+                title: Text(_languageService.translate('loginRegister')),
+                onTap: () {
+                  Navigator.pushNamed(context, '/login');
+                },
               ),
             ],
           ),
@@ -459,6 +469,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     }
+  }
+
+  // Show logout confirmation dialog
+  Future<void> _showLogoutConfirmation() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(_languageService.translate('logout')),
+          content: Text(_languageService.translate('logoutConfirm')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_languageService.translate('cancel')),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                // Используем новый метод logoutUser
+                final success = await _dbHelper.logoutUser();
+                if (success) {
+                  if (mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const Loginregister()),
+                      (Route<dynamic> route) => false,
+                    );
+                  }
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(_languageService.translate('logoutFailed'))),
+                    );
+                  }
+                }
+              },
+              child: Text(_languageService.translate('logout')),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 

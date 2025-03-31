@@ -4,7 +4,6 @@ import 'package:personal_finance/database/database_helper.dart';
 import 'package:personal_finance/utils/currency_utils.dart';
 import 'package:personal_finance/services/language_service.dart';
 import 'package:intl/intl.dart';
-import 'dart:math' show max;
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -194,7 +193,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Container(
-        color: Theme.of(context).colorScheme.background,
+        color: Theme.of(context).colorScheme.surface,
         child: Column(
           children: [
             // Date range and chart toggle
@@ -393,7 +392,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         margin: const EdgeInsets.symmetric(
                             vertical: 12, horizontal: 16),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(24),
                         ),
                         child: Row(
@@ -505,7 +504,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         child: categoryData.isEmpty
                             ? Center(
                                 child: Text(
-                                  'No ${selectedType} data for selected period',
+                                  'No $selectedType data for selected period',
                                   style: TextStyle(
                                     color: Theme.of(context)
                                         .colorScheme
@@ -617,7 +616,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (categoryData.isEmpty) {
         return Center(
           child: Text(
-            'No ${selectedType} data for selected period',
+            'No $selectedType data for selected period',
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
@@ -650,7 +649,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               badgeWidget: percentage >= 10
                   ? _buildCategoryBadge(entry.key, percentage)
                   : null,
-              badgePositionPercentageOffset: 1.1,
+              badgePositionPercentageOffset: 1.4,
             );
           }).toList(),
           pieTouchData: PieTouchData(
@@ -721,7 +720,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
         subtitle: LinearProgressIndicator(
           value: percentage / 100,
-          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           color: _getCategoryColor(category),
           minHeight: 4,
         ),

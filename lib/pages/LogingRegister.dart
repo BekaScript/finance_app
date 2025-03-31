@@ -19,6 +19,8 @@ class _LoginregisterState extends State<Loginregister> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final LanguageService _languageService = LanguageService();
   bool _rememberMe = false;
+  String _errorMessage = '';
+  bool _isLoading = false;
 
   // Function to handle login
   Future<bool> _login(String email, String password) async {
@@ -93,9 +95,157 @@ class _LoginregisterState extends State<Loginregister> {
     );
   }
 
+  Future<void> _handleRegistration() async {
+    final String name = _nameController.text.trim();
+    final String email = _emailController.text.trim();
+    final String password = _passwordController.text;
+    
+    // Basic validation
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      setState(() {
+        _errorMessage = _languageService.translate('allFieldsRequired');
+      });
+      return;
+    }
+    
+    // Email validation
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      setState(() {
+        _errorMessage = _languageService.translate('invalidEmail');
+      });
+      return;
+    }
+    
+    // Password strength validation
+    if (password.length < 6) {
+      setState(() {
+        _errorMessage = _languageService.translate('passwordTooShort');
+      });
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    
+    try {
+      // Register the user with DatabaseHelper
+      final userData = {
+        'name': name,
+        'email': email,
+        'password': password,
+        'is_logged_in': 1, // Login after registration
+        'remember_me': 0,
+      };
+      
+      final result = await _dbHelper.registerUser(userData);
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (result == -1) {
+        // User already exists
+        setState(() {
+          _errorMessage = _languageService.translate('emailAlreadyExists');
+        });
+      } else if (result > 0) {
+        // Registration successful, navigate to home
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      } else {
+        // Unknown error
+        setState(() {
+          _errorMessage = _languageService.translate('registrationFailed');
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Error: $e';
+      });
+    }
+  }
+
+  Future<void> _handleLogin() async {
+    final String email = _emailController.text.trim();
+    final String password = _passwordController.text;
+    
+    // Basic validation
+    if (email.isEmpty || password.isEmpty) {
+      setState(() {
+        _errorMessage = _languageService.translate('emailAndPasswordRequired');
+      });
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    
+    try {
+      // Login with DatabaseHelper
+      final user = await _dbHelper.loginUser(
+        email,
+        password,
+        _rememberMe,
+      );
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (user != null) {
+        // Login successful, navigate to home
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      } else {
+        // Invalid credentials
+        setState(() {
+          _errorMessage = _languageService.translate('invalidCredentials');
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Error: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _isLogin
+              ? _languageService.translate('login')
+              : _languageService.translate('register'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF1A237E), Color(0xFF64B5F6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+        ),
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -126,22 +276,43 @@ class _LoginregisterState extends State<Loginregister> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // App Logo or Title
-                        const Icon(
-                          Icons.account_circle,
+                        // Logo or app name
+                        const SizedBox(height: 24),
+                        Icon(
+                          _isLogin ? Icons.lock_open : Icons.person_add,
                           size: 80,
                           color: Colors.deepPurple,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
                         Text(
-                          _isLogin ? _languageService.translate('welcomeBack') : _languageService.translate('createAccount'),
+                          _isLogin
+                              ? _languageService.translate('welcomeBack')
+                              : _languageService.translate('createAccount'),
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple,
                           ),
+                          textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
+                        
+                        // Error message
+                        if (_errorMessage.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red),
+                            ),
+                            child: Text(
+                              _errorMessage,
+                              style: const TextStyle(color: Colors.red),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        
                         // Show name field only for registration
                         if (!_isLogin)
                           TextFormField(
@@ -227,41 +398,10 @@ class _LoginregisterState extends State<Loginregister> {
                               if (_formKey.currentState!.validate()) {
                                 if (_isLogin) {
                                   // Handle Login
-                                  final success = await _login(
-                                    _emailController.text,
-                                    _passwordController.text,
-                                  );
-                                  
-                                  if (success) {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(
-                                        builder: (context) => const MainNavigationScreen(),
-                                      ),
-                                    );
-                                  } else {
-                                    _showError(_languageService.translate('invalidEmailPassword'));
-                                  }
+                                  await _handleLogin();
                                 } else {
                                   // Handle Registration
-                                  final success = await _register(
-                                    _nameController.text,
-                                    _emailController.text,
-                                    _passwordController.text,
-                                  );
-                                  
-                                  if (success) {
-                                    setState(() {
-                                      _isLogin = true; // Switch to login view
-                                    });
-                                    _showError(_languageService.translate('registrationSuccessful'));
-                                    
-                                    // Clear the form
-                                    _nameController.clear();
-                                    _emailController.clear();
-                                    _passwordController.clear();
-                                  } else {
-                                    _showError(_languageService.translate('emailExists'));
-                                  }
+                                  await _handleRegistration();
                                 }
                               }
                             },

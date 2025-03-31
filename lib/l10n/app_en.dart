@@ -71,6 +71,7 @@ Map<String, String> get en => {
   'yes': 'Yes',
   'no': 'No',
   'login': 'Login',
+  'loginRegister': 'Login / Register',
   'register': 'Register',
   'username': 'Username',
   'password': 'Password',
@@ -103,4 +104,25 @@ Map<String, String> get en => {
   'unlockSuccessful': 'App unlocked successfully',
   'incomeByDay': 'Income by day',
   'expenseByDay': 'Expense by day',
+  
+  // Auth errors
+  'invalidCredentials': 'Invalid email or password',
+  'emailAndPasswordRequired': 'Email and password are required',
+  'allFieldsRequired': 'All fields are required',
+  'invalidEmail': 'Invalid email format',
+  'emailAlreadyExists': 'This email is already registered',
+  'registrationFailed': 'Registration failed',
+  
+  // CSV related
+  'exportToCsv': 'Export to CSV',
+  'importFromCsv': 'Import from CSV',
+  'csvExport': 'CSV Export',
+  'noTransactionsInCsv': 'No transactions found in CSV',
+  'walletCreated': 'Wallet created successfully',
+  'enterWalletName': 'Please enter wallet name',
+  'walletType': 'Wallet Type',
+  'cash': 'Cash',
+  'card': 'Card',
+  'noWallets': 'No wallets added yet',
+  'dragToTransfer': 'Drag to transfer',
 }; 
