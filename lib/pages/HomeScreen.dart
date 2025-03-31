@@ -170,6 +170,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _userName = users.first['name'] ?? 'User';
         _userEmail = users.first['email'] ?? '';
       });
+    } else {
+      // Not logged in, use "Guest" as the name
+      setState(() {
+        _userName = 'Guest';
+        _userEmail = '';
+      });
     }
   }
 

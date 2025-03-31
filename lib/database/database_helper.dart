@@ -1060,4 +1060,23 @@ class DatabaseHelper {
       print("Ошибка при проверке/создании таблицы wallets: $e");
     }
   }
+
+  // Get the user's display name - simplified to just return empty for non-logged in users
+  Future<String> getDisplayName() async {
+    final db = await database;
+    
+    // First check for logged in user
+    final List<Map<String, dynamic>> users = await db.query(
+      'user',
+      where: 'is_logged_in = ?',
+      whereArgs: [1],
+      limit: 1
+    );
+    
+    if (users.isNotEmpty) {
+      return users.first['name'] ?? '';
+    }
+    
+    return ''; // Return empty if no logged in user
+  }
 }

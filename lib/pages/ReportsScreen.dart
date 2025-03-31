@@ -633,7 +633,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             return PieChartSectionData(
               color: _getCategoryColor(entry.key),
               value: entry.value,
-              title: percentage >= 5 ? '${percentage.toStringAsFixed(1)}%' : '',
+              title: '',
               radius: 24,
               titleStyle: TextStyle(
                 fontSize: 12,
@@ -649,7 +649,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               badgeWidget: percentage >= 10
                   ? _buildCategoryBadge(entry.key, percentage)
                   : null,
-              badgePositionPercentageOffset: 1.4,
+              badgePositionPercentageOffset: 2.5,
             );
           }).toList(),
           pieTouchData: PieTouchData(
