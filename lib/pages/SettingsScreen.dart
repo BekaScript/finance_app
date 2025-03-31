@@ -30,7 +30,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadSettings();
-    print('SettingsScreen initialized');
   }
   
   @override
@@ -40,11 +39,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    print('SettingsScreen: Loading settings...');
     final currency = await _dbHelper.getCurrency();
     final language = await _languageService.getCurrentLanguage();
     final isDarkMode = await _dbHelper.getDarkMode();
-    print('SettingsScreen: Current dark mode setting: $isDarkMode');
     if (mounted) {
       setState(() {
         _selectedCurrency = currency;
@@ -54,208 +51,239 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _selectCurrency(String? currency) async {
-    if (currency != null) {
-      await _dbHelper.setCurrency(currency);
-      if (mounted) {
-        setState(() {
-          _selectedCurrency = currency;
-        });
-      }
-      // Force refresh of all screens that show currency
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Currency updated successfully'),
-            duration: Duration(seconds: 2),
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _languageService.translate('settings'),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurface,
           ),
-        );
-      }
-    }
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: colorScheme.surface,
+        iconTheme: IconThemeData(color: colorScheme.onSurface),
+      ),
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // App Settings Section
+                _SectionHeader(
+                    title: _languageService.translate('appSettings')),
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    _SettingSwitchTile(
+                      icon: Icons.dark_mode,
+                      title: _languageService.translate('darkMode'),
+                      value: _isDarkMode,
+                      onChanged: (value) => _toggleTheme(),
+                    ),
+                    _SettingDropdownTile<String>(
+                      icon: Icons.language,
+                      title: _languageService.translate('selectLanguage'),
+                      value: _selectedLanguage,
+                      items: [
+                        DropdownMenuItem(
+                          value: 'en',
+                          child: Text(_languageService.translate('english')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ru',
+                          child: Text(_languageService.translate('russian')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ky',
+                          child: Text(_languageService.translate('kyrgyz')),
+                        ),
+                      ],
+                      onChanged: (value) => _handleLanguageChange(value),
+                    ),
+                    _SettingDropdownTile<String>(
+                      icon: Icons.currency_exchange,
+                      title: _languageService.translate('selectCurrency'),
+                      value: _selectedCurrency,
+                      items: ['USD', 'EUR', 'INR', 'KGS'].map((currency) {
+                        return DropdownMenuItem(
+                          value: currency,
+                          child: Text(_languageService.translate(currency)),
+                        );
+                      }).toList(),
+                      onChanged: (value) => _handleCurrencyChange(value),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Data Management Section
+                _SectionHeader(
+                    title: _languageService.translate('dataManagement')),
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    _ActionTile(
+                      icon: Icons.file_download,
+                      iconColor: colorScheme.primary,
+                      title: _languageService.translate('exportData'),
+                      subtitle:
+                          _languageService.translate('exportDataDescription'),
+                      onTap: _showExportOptionsDialog,
+                    ),
+                    const Divider(height: 1),
+                    _ActionTile(
+                      icon: Icons.restore,
+                      iconColor: Colors.orange,
+                      title: _languageService.translate('resetData'),
+                      subtitle:
+                          _languageService.translate('resetDataDescription'),
+                      onTap: _showResetConfirmation,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Account Section
+                _SectionHeader(title: _languageService.translate('account')),
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    _ActionTile(
+                      icon: Icons.login,
+                      iconColor: colorScheme.primary,
+                      title: _languageService.translate('loginRegister'),
+                      onTap: () => Navigator.pushNamed(context, '/login'),
+                    ),
+                  ],
+                ),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _toggleTheme() async {
-    print('SettingsScreen: Toggling theme');
     final newValue = !_isDarkMode;
     await _themeService.toggleTheme();
     if (mounted) {
       setState(() {
         _isDarkMode = newValue;
       });
-      print('SettingsScreen: Theme toggled to: $newValue');
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _languageService.translate('settings'),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
+  Future<void> _handleLanguageChange(String? newValue) async {
+    if (newValue != null) {
+      await _languageService.setLanguage(newValue);
+      if (mounted) {
+        setState(() {
+          _selectedLanguage = newValue;
+        });
+        _showSnackBar(_languageService.translate('languageUpdated'));
+      }
+    }
+  }
+
+  Future<void> _handleCurrencyChange(String? newValue) async {
+    if (newValue != null) {
+      _showExchangeRateDialog(newValue);
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
         ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1A237E), Color(0xFF64B5F6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.black.withAlpha(179)
-              : Colors.white.withAlpha(179),
+    );
+  }
+
+  Future<void> _showExchangeRateDialog(String currency) async {
+    if (currency == _selectedCurrency) return;
+
+    double currentRate = await _dbHelper.getExchangeRate(currency);
+    final rateController =
+        TextEditingController(text: currentRate.toStringAsFixed(2));
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ListView(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Theme Toggle
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: SwitchListTile.adaptive(
-                  title: Text(_languageService.translate('darkMode'),
-                      style: const TextStyle(fontSize: 16)),
-                  subtitle: Text(_isDarkMode
-                      ? _languageService.translate('enabled')
-                      : _languageService.translate('disabled')),
-                  value: _isDarkMode,
-                  onChanged: (value) => _toggleTheme(),
-                  secondary:
-                      const Icon(Icons.dark_mode, color: Colors.deepPurple),
+              Text(
+                _languageService.translate('setExchangeRate'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              Text('1 ${_languageService.translate(currency)} = ? KGS'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: rateController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: _languageService.translate('exchangeRate'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              // Currency Selection
-              _buildCurrencySelector(),
-
-              const SizedBox(height: 16),
-
-              // Language Selection
-              ListTile(
-                leading: const Icon(Icons.language, color: Colors.deepPurple),
-                title: Text(_languageService.translate('selectLanguage')),
-                subtitle: DropdownButtonFormField<String>(
-                  value: _selectedLanguage,
-                  onChanged: (String? newValue) async {
-                    if (newValue != null) {
-                      await _languageService.setLanguage(newValue);
-                      if (mounted) {
-                        setState(() {
-                          _selectedLanguage = newValue;
-                        });
-                        // Show a snackbar to confirm the language change
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(_languageService
-                                  .translate('languageUpdated')),
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(_languageService.translate('cancel')),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        double? rate = double.tryParse(rateController.text);
+                        if (rate != null && rate > 0) {
+                          await _dbHelper.setExchangeRate(currency, rate);
+                          await _dbHelper.setCurrency(currency);
+                          if (mounted) {
+                            setState(() {
+                              _selectedCurrency = currency;
+                            });
+                            Navigator.pop(context);
+                            _showSnackBar(_languageService
+                                .translate('currencyRateUpdated'));
+                          }
+                        } else {
+                          _showSnackBar(
+                              _languageService.translate('invalidRate'));
                         }
-                      }
-                    }
-                  },
-                  items: [
-                    DropdownMenuItem(
-                      value: 'en',
-                      child: Text(_languageService.translate('english')),
-                    ),
-                    DropdownMenuItem(
-                      value: 'ru',
-                      child: Text(_languageService.translate('russian')),
-                    ),
-                    DropdownMenuItem(
-                      value: 'ky',
-                      child: Text(_languageService.translate('kyrgyz')),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Reset Data Button
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: const Icon(Icons.restore, color: Colors.orange),
-                  title: Text(
-                    _languageService.translate('resetData'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      },
+                      child: Text(_languageService.translate('save')),
                     ),
                   ),
-                  subtitle: Text(
-                    _languageService.translate('resetDataDescription'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.color
-                          ?.withOpacity(0.6),
-                    ),
-                  ),
-                  onTap: _showResetConfirmation,
-                ),
-              ),
-
-              // CSV Export Button
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: const Icon(Icons.file_download, color: Colors.green),
-                  title: Text(
-                    _languageService.translate('exportData'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    _languageService.translate('exportDataDescription'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.color
-                          ?.withOpacity(0.6),
-                    ),
-                  ),
-                  onTap: _showExportOptionsDialog,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Login/Register button
-              ListTile(
-                leading: const Icon(Icons.login),
-                title: Text(_languageService.translate('loginRegister')),
-                onTap: () {
-                  Navigator.pushNamed(context, '/login');
-                },
+                ],
               ),
             ],
           ),
@@ -264,55 +292,105 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // Currency selection
-  Widget _buildCurrencySelector() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Future<void> _showResetConfirmation() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_languageService.translate('resetDataConfirmation')),
+        content: Text(_languageService.translate('areYouSureResetData')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_languageService.translate('cancel')),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _resetData();
+            },
+            child: Text(
+              _languageService.translate('reset'),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _resetData() async {
+    try {
+      _showLoadingSnackBar(_languageService.translate('resettingData'));
+      final success = await _dbHelper.resetTransactionData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        if (success) {
+          _showSnackBar(_languageService.translate('resetDataSuccess'));
+        } else {
+          _showSnackBar(_languageService.translate('resetDataError'));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar(_languageService.translate('resetDataError'));
+      }
+    }
+  }
+
+  void _showLoadingSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
           children: [
-            Row(
-              children: [
-                const Icon(Icons.currency_exchange, color: Colors.deepPurple),
-                const SizedBox(width: 8),
-                Text(
-                  _languageService.translate('selectCurrency'),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 16),
+            Text(message),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _showExportOptionsDialog() async {
+    await showModalBottomSheet(
+      context: context,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _languageService.translate('exportData'),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedCurrency,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ListTile(
+              leading: Icon(
+                Icons.calendar_month,
+                color: Theme.of(context).colorScheme.primary,
               ),
-              onChanged: (String? value) {
-                if (value != null) {
-                  _showExchangeRateDialog(value);
-                }
+              title: Text(_languageService.translate('exportForCurrentMonth')),
+              onTap: () {
+                Navigator.pop(context);
+                _exportCurrentMonth();
               },
-              items: ['USD', 'EUR', 'INR', 'KGS'].map((currency) {
-                return DropdownMenuItem<String>(
-                  value: currency,
-                  child: Row(
-                    children: [
-                      _getCurrencyIcon(currency),
-                      const SizedBox(width: 8),
-                      Text(_languageService.translate(currency)),
-                    ],
-                  ),
-                );
-              }).toList(),
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.date_range,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(_languageService.translate('exportForCustomRange')),
+              onTap: () {
+                Navigator.pop(context);
+                _showDateRangeDialog();
+              },
             ),
           ],
         ),
@@ -320,62 +398,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // Helper to get currency icon
-  Widget _getCurrencyIcon(String currency) {
-    IconData iconData;
-    Color iconColor;
-
-    switch (currency) {
-      case 'USD':
-        iconData = Icons.attach_money;
-        iconColor = Colors.green;
-        break;
-      case 'EUR':
-        iconData = Icons.euro;
-        iconColor = Colors.blue;
-        break;
-      case 'INR':
-        iconData = Icons.currency_rupee;
-        iconColor = Colors.orange;
-        break;
-      case 'KGS':
-        iconData = Icons.money;
-        iconColor = Colors.purple;
-        break;
-      default:
-        iconData = Icons.money;
-        iconColor = Colors.grey;
-    }
-
-    return Icon(iconData, color: iconColor);
+  Future<void> _exportCurrentMonth() async {
+    final now = DateTime.now();
+    final firstDayOfMonth = DateTime(now.year, now.month, 1);
+    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
+    await _exportData(firstDayOfMonth, lastDayOfMonth);
   }
 
-  // Show exchange rate dialog when selecting currency
-  Future<void> _showExchangeRateDialog(String currency) async {
-    if (currency == _selectedCurrency) return;
+  Future<void> _showDateRangeDialog() async {
+    final now = DateTime.now();
+    DateTime startDate = DateTime(now.year, now.month, 1);
+    DateTime endDate = now;
 
-    // Get current exchange rate for this currency
-    double currentRate = await _dbHelper.getExchangeRate(currency);
-    final rateController = TextEditingController(text: currentRate.toString());
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _languageService.translate('selectDateRange'),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 24),
+                  _DatePickerField(
+                    label: _languageService.translate('selectStartDate'),
+                    selectedDate: startDate,
+                    onDateSelected: (date) {
+                      setState(() {
+                        startDate = date;
+                        if (endDate.isBefore(startDate)) {
+                          endDate = startDate;
+                        }
+                      });
+                    },
+                    firstDate: DateTime(2000),
+                    lastDate: endDate,
+                  ),
+                  const SizedBox(height: 16),
+                  _DatePickerField(
+                    label: _languageService.translate('selectEndDate'),
+                    selectedDate: endDate,
+                    onDateSelected: (date) => setState(() => endDate = date),
+                    firstDate: startDate,
+                    lastDate: DateTime.now(),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _exportData(startDate, endDate);
+                    },
+                    child: Text(_languageService.translate('exportToCsv')),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
+  Future<void> _exportData(DateTime startDate, DateTime endDate) async {
+    try {
+      _showLoadingSnackBar(_languageService.translate('exporting'));
+      final currency = await _dbHelper.getCurrency();
+      final filePath = await _csvService.exportTransactionHistory(
+        startDate,
+        endDate,
+        currency,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        if (filePath.isNotEmpty) {
+          _showExportSuccessDialog(filePath);
+        } else {
+          _showSnackBar(_languageService.translate('exportError'));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar(_languageService.translate('exportError'));
+      }
+    }
+  }
+
+  Future<void> _showExportSuccessDialog(String filePath) async {
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(_languageService.translate('setExchangeRate')),
+        title: Text(_languageService.translate('exportComplete')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('1 ${_languageService.translate(currency)} = ? KGS'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: rateController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: _languageService.translate('exchangeRate'),
-                border: const OutlineInputBorder(),
-              ),
+            Text(_languageService.translate('exportSuccess')),
+            const SizedBox(height: 8),
+            Text(
+              '${_languageService.translate('fileSaved')}\n$filePath',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
@@ -385,422 +516,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text(_languageService.translate('cancel')),
           ),
           ElevatedButton(
-            onPressed: () async {
-              // Parse the rate and validate
-              double? rate = double.tryParse(rateController.text);
-              if (rate != null && rate > 0) {
-                // Update the exchange rate
-                await _dbHelper.setExchangeRate(currency, rate);
-                // Update the currency
-                await _setCurrency(currency);
-                // Close dialog
-                if (mounted) {
-                  Navigator.pop(context);
-                  // Show confirmation
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        _languageService.translate('currencyRateUpdated'),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } else {
-                // Show error
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(_languageService.translate('invalidRate')),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
+            onPressed: () {
+              Navigator.pop(context);
+              _shareFile(filePath);
             },
-            child: Text(_languageService.translate('save')),
+            child: Text(_languageService.translate('shareFile')),
           ),
         ],
       ),
     );
   }
 
-  // Set currency in database
-  Future<void> _setCurrency(String currency) async {
-    await _dbHelper.setCurrency(currency);
-    setState(() {
-      _selectedCurrency = currency;
-    });
-  }
-
-  // Show reset confirmation dialog
-  Future<void> _showResetConfirmation() async {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(_languageService.translate('resetDataConfirmation')),
-          content: Text(_languageService.translate('areYouSureResetData')),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(_languageService.translate('cancel')),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                await _resetData();
-              },
-              child: Text(
-                _languageService.translate('reset'),
-                style: const TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Reset data
-  Future<void> _resetData() async {
-    try {
-      // Show loading indicator
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(_languageService.translate('resettingData')),
-              ],
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-
-      // Call the database helper reset method
-      final success = await _dbHelper.resetTransactionData();
-
-      if (mounted) {
-        if (success) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_languageService.translate('resetDataSuccess')),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        } else {
-          // Show error message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_languageService.translate('resetDataError')),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      print('Error resetting data: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_languageService.translate('resetDataError')),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  // Show logout confirmation dialog
-  Future<void> _showLogoutConfirmation() async {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(_languageService.translate('logout')),
-          content: Text(_languageService.translate('logoutConfirm')),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(_languageService.translate('cancel')),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                // Используем новый метод logoutUser
-                final success = await _dbHelper.logoutUser();
-                if (success) {
-                  if (mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                          builder: (context) => const Loginregister()),
-                      (Route<dynamic> route) => false,
-                    );
-                  }
-                } else {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content:
-                              Text(_languageService.translate('logoutFailed'))),
-                    );
-                  }
-                }
-              },
-              child: Text(_languageService.translate('logout')),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Show export options dialog
-  Future<void> _showExportOptionsDialog() async {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(_languageService.translate('exportData')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.calendar_month),
-                title:
-                    Text(_languageService.translate('exportForCurrentMonth')),
-                onTap: () {
-                  Navigator.pop(context);
-                  _exportCurrentMonth();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.date_range),
-                title: Text(_languageService.translate('exportForCustomRange')),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showDateRangeDialog();
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(_languageService.translate('cancel')),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Export for current month
-  Future<void> _exportCurrentMonth() async {
-    final now = DateTime.now();
-    final firstDayOfMonth = DateTime(now.year, now.month, 1);
-    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
-
-    await _exportData(firstDayOfMonth, lastDayOfMonth);
-  }
-
-  // Show dialog to select custom date range
-  Future<void> _showDateRangeDialog() async {
-    final now = DateTime.now();
-    DateTime startDate = DateTime(now.year, now.month, 1);
-    DateTime endDate = DateTime(now.year, now.month, now.day);
-
-    return showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text(_languageService.translate('selectDateRange')),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      title:
-                          Text(_languageService.translate('selectStartDate')),
-                      subtitle:
-                          Text(DateFormat('MMM dd, yyyy').format(startDate)),
-                      trailing: const Icon(Icons.calendar_today),
-                      onTap: () async {
-                        final pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: startDate,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime.now(),
-                        );
-                        if (pickedDate != null) {
-                          setState(() {
-                            startDate = pickedDate;
-                            // Ensure end date is not before start date
-                            if (endDate.isBefore(startDate)) {
-                              endDate = startDate;
-                            }
-                          });
-                        }
-                      },
-                    ),
-                    ListTile(
-                      title: Text(_languageService.translate('selectEndDate')),
-                      subtitle:
-                          Text(DateFormat('MMM dd, yyyy').format(endDate)),
-                      trailing: const Icon(Icons.calendar_today),
-                      onTap: () async {
-                        final pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: endDate,
-                          firstDate: startDate,
-                          lastDate: DateTime.now(),
-                        );
-                        if (pickedDate != null) {
-                          setState(() {
-                            endDate = pickedDate;
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(_languageService.translate('cancel')),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _exportData(startDate, endDate);
-                  },
-                  child: Text(_languageService.translate('exportToCsv')),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // Export data for the selected date range
-  Future<void> _exportData(DateTime startDate, DateTime endDate) async {
-    try {
-      // Show loading indicator
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(_languageService.translate('exporting')),
-              ],
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-
-      // Get currency
-      final currency = await _dbHelper.getCurrency();
-
-      // Export data
-      final filePath = await _csvService.exportTransactionHistory(
-        startDate,
-        endDate,
-        currency,
-      );
-
-      if (filePath.isNotEmpty) {
-        _showExportSuccessDialog(filePath);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_languageService.translate('exportError')),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      print('Error exporting data: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_languageService.translate('exportError')),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  // Show export success dialog
-  Future<void> _showExportSuccessDialog(String filePath) async {
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(_languageService.translate('exportComplete')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_languageService.translate('exportSuccess')),
-              const SizedBox(height: 8),
-              Text(
-                '${_languageService.translate('fileSaved')}\n$filePath',
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(_languageService.translate('cancel')),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _shareFile(filePath);
-              },
-              child: Text(_languageService.translate('shareFile')),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Share the exported file
   Future<void> _shareFile(String filePath) async {
     try {
       final file = File(filePath);
@@ -808,25 +534,206 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await Share.shareXFiles([XFile(filePath)],
             text: _languageService.translate('transactionHistory'));
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_languageService.translate('exportError')),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        _showSnackBar(_languageService.translate('exportError'));
       }
     } catch (e) {
-      print('Error sharing file: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sharing file: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showSnackBar('Error sharing file: $e');
     }
+  }
+}
+
+// Custom Widgets for consistent design
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
+  }
+}
+
+class _SettingsCard extends StatelessWidget {
+  final List<Widget> children;
+
+  const _SettingsCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: Theme.of(context).dividerColor,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: children
+            .map((child) => [
+                  child,
+                  if (child != children.last)
+                    const Divider(height: 1, indent: 16),
+                ])
+            .expand((element) => element)
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _SettingSwitchTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SettingSwitchTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      title: Text(title, style: Theme.of(context).textTheme.bodyMedium),
+      trailing: Switch.adaptive(
+        value: value,
+        onChanged: onChanged,
+        activeColor: Theme.of(context).colorScheme.primary,
+      ),
+      minLeadingWidth: 24,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      onTap: () => onChanged(!value),
+    );
+  }
+}
+
+class _SettingDropdownTile<T> extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final T value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+
+  const _SettingDropdownTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      title: Text(title, style: Theme.of(context).textTheme.bodyMedium),
+      trailing: DropdownButton<T>(
+        value: value,
+        underline: const SizedBox(),
+        items: items,
+        onChanged: onChanged,
+      ),
+      minLeadingWidth: 24,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  const _ActionTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: iconColor),
+      title: Text(title, style: Theme.of(context).textTheme.bodyMedium),
+      subtitle: subtitle != null
+          ? Text(
+              subtitle!,
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          : null,
+      trailing: Icon(
+        Icons.chevron_right,
+        color: Theme.of(context).disabledColor,
+      ),
+      minLeadingWidth: 24,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      onTap: onTap,
+    );
+  }
+}
+
+class _DatePickerField extends StatelessWidget {
+  final String label;
+  final DateTime selectedDate;
+  final ValueChanged<DateTime> onDateSelected;
+  final DateTime firstDate;
+  final DateTime lastDate;
+
+  const _DatePickerField({
+    required this.label,
+    required this.selectedDate,
+    required this.onDateSelected,
+    required this.firstDate,
+    required this.lastDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () async {
+        final pickedDate = await showDatePicker(
+          context: context,
+          initialDate: selectedDate,
+          firstDate: firstDate,
+          lastDate: lastDate,
+        );
+        if (pickedDate != null) {
+          onDateSelected(pickedDate);
+        }
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          suffixIcon: const Icon(Icons.calendar_today),
+        ),
+        child: Text(
+          DateFormat('MMM dd, yyyy').format(selectedDate),
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ),
+    );
   }
 }
